@@ -1,0 +1,56 @@
+## Object (1 keys)
+
+- **merchantPaymentSearchDTO**: `object`
+  - **paymentList**: `object`
+    - **list**: `array[854]` of objects (49 keys)
+      - **id**: `string` — e.g. 'MjAwNDQyNjYw'
+      - **transactionDate**: `string` — e.g. '14/11/2024'
+      - **transactionNumber**: `integer` — e.g. '4867838524111451721'
+      - **installmentNumber**: `string` — e.g. '7/10'
+      - **installmentValue**: `float` — e.g. '838.00'
+      - **transactionValue**: `float` — e.g. '8380.00'
+      - **value**: `float` — e.g. '811.26'
+      - **grossValue**: `float` — e.g. '811.26'
+      - **receiptId**: `string` — e.g. 'MjAwNDQyNjYw'
+      - **paymentBrand**: `string` — e.g. 'Visa'
+      - **processor**: `string` — e.g. 'PagService'
+      - **product**: `string` — e.g. 'POS'
+      - **status**: `string` — e.g. 'PAID'
+      - **notAnticipatable**: `boolean` — e.g. 'true'
+      - **anticipateValue**: `float` — e.g. '0.00'
+      - **discountedValue**: `mixed` — e.g. '26.74'
+      - **clientName**: `string` — e.g. 'RENATA G BOCCHI'
+      - **payedValue**: `mixed` — e.g. '811.26'
+      - **currency**: `string` — e.g. 'BRL'
+      - **dateReceived**: `string` — e.g. '16/06/2025'
+      - **cpf**: `mixed` — e.g. '-'
+      - **merchant**: `string` — e.g. 'Oftalmologia Veterinaria Mamede E Tasso LTDA FINPET'
+      - **planType**: `string` — e.g. 'FULL_STANDARD_PLAN_TYPE'
+      - **type**: `string` — e.g. 'MERCHANT'
+      - **userName**: `string` — e.g. 'Fabricio Villela Mamede'
+      - **merchantDocument**: `integer` — e.g. '14371342000122'
+      - **merchantUserEmail**: `string` — e.g. 'fabriciovm@hotmail.com'
+      - **beneficiary**: `string` — e.g. 'Oftalmologia Veterinaria Mamede E Tasso LTDA FINPET'
+      - **beneficiaryValue**: `float` — e.g. '811.26'
+      - **beneficiaryDocument**: `integer` — e.g. '14371342000122'
+      - **depositValue**: `float` — e.g. '811.26'
+      - **bank**: `string` — e.g. 'Banco Cooperativo do Brasil S.A.'
+      - **bankAgency**: `mixed` — e.g. '3214'
+      - **depositAccount**: `string` — e.g. '53790-0'
+      - **isBlocked**: `boolean` — e.g. False
+      - **hasChargeback**: `boolean` — e.g. False
+      - **nsu**: `integer` — e.g. '500527'
+      - **authorizationNumber**: `mixed` — e.g. '571150'
+      - **clientPhone**: `string` — e.g. '-'
+      - **fee**: `float` — e.g. '3.19'
+      - **beneficiaryType**: `string` — e.g. 'PAYMENT_TYPE_MERCHANT'
+      - **lastFourCardDigits**: `integer` — e.g. '2030'
+      - **dateEstimated**: `string` — e.g. '16/06/2025'
+      - **dueDate**: `string` — e.g. '16/06/2025'
+      - **urExternalReference**: `string` — e.g. '14371342000122_20250616_VCC_14371342000122'
+      - **hasContractApplied**: `boolean` — e.g. False
+      - **separatedPaymentValue**: `float` — e.g. '259.76'
+      - **retentionValue**: `float` — e.g. '152.54'
+      - **retentionReason**: `string` — e.g. 'Retenção sobre Split Finpet'
+    - **size**: `integer` — e.g. 854
+  - **anticipatable**: `boolean` — e.g. True
