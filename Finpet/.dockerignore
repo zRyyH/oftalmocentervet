@@ -1,0 +1,32 @@
+# === SEGURANÇA (CRÍTICO) ===
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.crt
+**/secrets/
+**/credentials/
+
+# === GIT ===
+.git/
+.gitignore
+
+# === PYTHON BUILD/CACHE ===
+**/__pycache__/
+**/*.pyc
+*.egg-info/
+venv/
+.venv/
+
+# === TESTES ===
+**/.pytest_cache/
+.coverage
+
+# === IDEs ===
+.idea/
+.vscode/
+
+# === DOCKER (evita recursão) ===
+Dockerfile*
+docker-compose*
+.dockerignore

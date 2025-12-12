@@ -3,6 +3,7 @@
 import time
 import schedule
 
+from datetime import datetime
 from config import SYNC_INTERVAL_MINUTES
 from repository import FinpetRepository
 from service import fetch_transactions
@@ -10,10 +11,14 @@ from logger import log
 
 
 def sync():
-    transactions = fetch_transactions()
+    hoje = datetime.now()
+
+    transactions = fetch_transactions(hoje=hoje)
     stats = FinpetRepository().sync(transactions)
 
-    log.info(f"Syncronizado: {stats['created']} | Erro: {stats['errors']}")
+    log.info(
+        f"Syncronizado: {stats['created']} | Atualizado: {stats['updated']} Erro: {stats['errors']} | Data: {hoje}"
+    )
 
 
 def main():

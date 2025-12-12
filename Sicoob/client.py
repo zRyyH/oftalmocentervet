@@ -1,5 +1,6 @@
 import requests
 import config
+from logger import log
 
 
 def request(method: str, url: str, **kwargs) -> requests.Response | None:
@@ -12,5 +13,5 @@ def request(method: str, url: str, **kwargs) -> requests.Response | None:
             **kwargs,
         )
     except requests.RequestException as e:
-        print(f"Erro na requisiÃ§Ã£o: {e}")
+        log.error(f"Requisição falhou: {e}")
         return None

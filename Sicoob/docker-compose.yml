@@ -1,0 +1,19 @@
+services:
+  sicoob:
+    build: .
+    restart: unless-stopped
+    environment:
+      - CERT_CRT=${CERT_CRT}
+      - CERT_KEY=${CERT_KEY}
+      - CLIENT_ID=${CLIENT_ID}
+      - CONTA_CORRENTE=${CONTA_CORRENTE}
+      - POCKETBASE_URL=${POCKETBASE_URL}
+      - POCKETBASE_EMAIL=${POCKETBASE_EMAIL}
+      - POCKETBASE_PASSWORD=${POCKETBASE_PASSWORD}
+      - COLLECTION_NAME=${COLLECTION_NAME}
+      - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES}
+    volumes:
+      - keys:/app/keys:ro
+
+volumes:
+  keys:

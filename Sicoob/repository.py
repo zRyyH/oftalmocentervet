@@ -1,45 +1,37 @@
-"""Repositório para operações no PocketBase."""
-
 from pocketbase import PocketBase
+from datetime import datetime
 
 from config import (
-    COLLECTION_NAME,
     POCKETBASE_URL,
     POCKETBASE_EMAIL,
     POCKETBASE_PASSWORD,
+    COLLECTION_NAME,
 )
 from logger import log
 
 
-class FinpetRepository:
-    """Gerencia operações na collection finpet."""
+class ExtratoRepository:
 
     def __init__(self):
         self.pb = PocketBase(POCKETBASE_URL)
         self.pb.admins.auth_with_password(POCKETBASE_EMAIL, POCKETBASE_PASSWORD)
         self.collection = self.pb.collection(COLLECTION_NAME)
 
-    def find_by_id_t(self, id_t: str):
-        """Busca transação por id_t. Retorna o registro ou None."""
-        result = self.collection.get_list(1, 1, {"filter": f'id_t = "{id_t}"'})
-        return result.items[0] if result.items else None
+    def find_by_transaction_id(self, transaction_id: str):
+        try:
+            result = self.collection.get_list(
+                1, 1, {"filter": f'transaction_id = "{transaction_id}"'}
+            )
+            return result.items[0] if result.items else None
+        except Exception:
+            return None
 
     def _normalize(self, value):
-        """Normaliza valor para comparação."""
-        from datetime import datetime
-
         if value is None or value == "":
             return None
 
         if isinstance(value, str):
-            for fmt in (
-                "%Y-%m-%dT%H:%M:%S",
-                "%Y-%m-%d %H:%M:%S",
-                "%Y-%m-%dT%H:%M:%S.%fZ",
-                "%Y-%m-%d %H:%M:%S.%fZ",
-                "%Y-%m-%dT%H:%M:%SZ",
-                "%Y-%m-%d",
-            ):
+            for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%fZ", "%Y-%m-%d"):
                 try:
                     return datetime.strptime(value, fmt)
                 except ValueError:
@@ -48,39 +40,41 @@ class FinpetRepository:
         return value
 
     def get_changes(self, existing, new: dict) -> dict:
-        """Retorna campos alterados: {campo: (antes, depois)}."""
         changes = {}
         for key, value in new.items():
-            old_value = getattr(existing, key, None)
-            if self._normalize(old_value) != self._normalize(value):
-                changes[key] = (old_value, value)
+            old = self._normalize(getattr(existing, key, None))
+            if old != self._normalize(value):
+                changes[key] = (old, value)
         return changes
 
     def sync(self, transactions: list[dict]) -> dict:
-        """Sincroniza transações. Retorna estatísticas."""
         stats = {"created": 0, "updated": 0, "skipped": 0, "errors": 0}
 
         for t in transactions:
+            tid = t.get("transaction_id")
             try:
-                existing = self.find_by_id_t(t["id_t"])
+                existing = self.find_by_transaction_id(tid)
 
                 if existing:
                     changes = self.get_changes(existing, t)
                     if changes:
                         self.collection.update(existing.id, t)
                         stats["updated"] += 1
-                        log.info(f"Atualizada: {t['id_t']}")
-                        for campo, (antes, depois) in changes.items():
-                            log.info(f"  {campo}: {antes!r} → {depois!r}")
+                        diff = ", ".join(
+                            f"{k} [{old} → {new}]" for k, (old, new) in changes.items()
+                        )
+                        log.info(f"~ {tid}: {diff}")
                     else:
                         stats["skipped"] += 1
                 else:
                     self.collection.create(t)
                     stats["created"] += 1
-                    log.info(f"Nova transação: {t['id_t']}")
+                    log.info(
+                        f"+ {tid}: {t['tipo']} R${t['valor']:.2f} - {t['descricao']}"
+                    )
 
             except Exception as e:
                 stats["errors"] += 1
-                log.error(f"Falha {t['id_t']}: {e}")
+                log.error(f"Transação {tid}: {e}")
 
         return stats

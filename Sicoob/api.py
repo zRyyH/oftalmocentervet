@@ -1,5 +1,6 @@
 import config
 import client
+from logger import log
 
 
 def get_access_token() -> str | None:
@@ -17,7 +18,7 @@ def get_access_token() -> str | None:
     if resp and resp.status_code == 200:
         return resp.json()["access_token"]
 
-    print(f"Erro ao obter token: {resp.text if resp else 'Sem resposta'}")
+    log.error(f"Token inválido: {resp.status_code if resp else 'sem resposta'}")
     return None
 
 
@@ -40,5 +41,5 @@ def get_extrato(mes: int, ano: int) -> dict | None:
     if resp and resp.status_code == 200:
         return resp.json()
 
-    print(f"Erro ao obter extrato: {resp.text if resp else 'Sem resposta'}")
+    log.error(f"Extrato falhou: {resp.status_code if resp else 'sem resposta'}")
     return None
