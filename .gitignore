@@ -1,19 +1,20 @@
 # Variáveis de ambiente
-.env
-.env.local
-.env.*.local
-!.env.example
-*.json
+**/.env
+**/.env.local
+**/.env.*.local
+**/!.env.example
+**/*.json
 
 # Cache do Python
-__pycache__/
-*.py[cod]
-*$py.class
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.venv
+**/.venv
 
 # Certificados e chaves
-*.crt
-*.pem
+**/*.crt
+**/*.pem
+**/*.key
