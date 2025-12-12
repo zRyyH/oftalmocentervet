@@ -1,7 +1,26 @@
 services:
-  finpet-sync:
+  finpet:
+    # image: zryyh/finpetsync:latest
     build: .
     container_name: finpet-sync
     restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      - POCKETBASE_URL=${POCKETBASE_URL}
+      - POCKETBASE_EMAIL=${POCKETBASE_EMAIL}
+      - POCKETBASE_PASSWORD=${POCKETBASE_PASSWORD}
+      - COLLECTION_NAME=${COLLECTION_NAME}
+      - FINPET_EMAIL=${FINPET_EMAIL}
+      - FINPET_PASSWORD=${FINPET_PASSWORD}
+      - DAYS_RANGE=${DAYS_RANGE}
+      - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES}
+    volumes:
+      - finpet_logs:/app/logs
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  finpet_logs:
+    driver: local
