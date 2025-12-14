@@ -6,7 +6,7 @@ services:
     container_name: releases-sync
     restart: unless-stopped
     env_file:
-      - .env.local # DEFINIR .ENV
+      - .env # DEFINIR .env
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
     networks:
@@ -17,7 +17,7 @@ services:
     container_name: conciliations-sync
     restart: unless-stopped
     env_file:
-      - .env.local # DEFINIR .ENV
+      - .env # DEFINIR .env
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
     networks:
@@ -28,7 +28,7 @@ services:
     container_name: sicoob-sync
     restart: unless-stopped
     env_file:
-      - .env.local # DEFINIR .ENV
+      - .env # DEFINIR .env
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
     volumes:
@@ -41,7 +41,7 @@ services:
     container_name: finpet-sync
     restart: unless-stopped
     env_file:
-      - .env.local # DEFINIR .ENV
+      - .env # DEFINIR .env
     environment:
       - POCKETBASE_URL=http://pocketbase:8090
     networks:

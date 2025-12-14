@@ -17,12 +17,12 @@ def fetch_conciliations(hoje: datetime) -> list[dict]:
         scrapper.login()
         raw = scrapper.get_conciliations(data_inicial, data_final)
 
-        with open("data.json", "w", encoding="utf-8") as f:
-            json.dump(raw, f, ensure_ascii=False, indent=4)
+        # with open("data.json", "w", encoding="utf-8") as f:
+        #     json.dump(raw, f, ensure_ascii=False, indent=4)
 
         raw_parsed = parse_conciliations(raw)
 
-        with open("data_parsed.json", "w", encoding="utf-8") as f:
-            json.dump(raw_parsed, f, ensure_ascii=False, indent=4)
+        # with open("data_parsed.json", "w", encoding="utf-8") as f:
+        #     json.dump(raw_parsed, f, ensure_ascii=False, indent=4)
 
     return raw_parsed
