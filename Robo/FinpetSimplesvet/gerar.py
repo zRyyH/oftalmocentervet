@@ -19,15 +19,15 @@ HEADERS = [
     "Bandeira",
     "Score",
     "Parcela Finpet",
-    "Parcela Release",
+    "Parcela Lançamento",
     "Valor Comparado Finpet",
-    "Valor Comparado Release",
+    "Valor Comparado Lançamento",
     "Data Finpet",
-    "Data Release",
+    "Data Lançamento",
     "Autorização Finpet",
-    "Autorização Release",
+    "Autorização Lançamento",
     "Cliente Finpet",
-    "Cliente Release",
+    "Cliente Lançamento",
 ]
 
 

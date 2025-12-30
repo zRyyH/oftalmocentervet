@@ -27,12 +27,6 @@ def fetch_transactions(hoje) -> list[dict]:
             .get("list", [])
         )
 
-        # with open("data.json", "w", encoding="utf-8") as f:
-        #     json.dump(data, f, ensure_ascii=False, indent=4)
-
         data_parsed = parse_transactions(data)
-
-        # with open("data_parsed.json", "w", encoding="utf-8") as f:
-        #     json.dump(data_parsed, f, ensure_ascii=False, indent=4)
 
     return data_parsed

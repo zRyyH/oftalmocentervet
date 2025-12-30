@@ -1,91 +1,88 @@
-# SERVIÇO SICOOB PRECISA DO CAMINHO REAL DAS KEYS NO SISTEMA
-
 services:
   releases:
     image: zryyh/releasessync:latest
     container_name: releases-sync
     restart: unless-stopped
     env_file:
-      - .env # DEFINIR .env
-    environment:
-      - POCKETBASE_URL=http://pocketbase:8090
+      - stack.env
     networks:
-      - pocketbase_network
+      - proxy_net
+    depends_on:
+      pocketoftalmo:
+        condition: service_healthy
 
   conciliations:
     image: zryyh/conciliationssync:latest
     container_name: conciliations-sync
     restart: unless-stopped
     env_file:
-      - .env # DEFINIR .env
-    environment:
-      - POCKETBASE_URL=http://pocketbase:8090
+      - stack.env
     networks:
-      - pocketbase_network
+      - proxy_net
+    depends_on:
+      pocketoftalmo:
+        condition: service_healthy
 
   sicoob:
     image: zryyh/sicoobsync:latest
     container_name: sicoob-sync
     restart: unless-stopped
     env_file:
-      - .env # DEFINIR .env
-    environment:
-      - POCKETBASE_URL=http://pocketbase:8090
+      - stack.env
     volumes:
-      - ./keys:/app/keys:ro # AQUI DEVE SER DEFINIDA O CAMINHO DAS KEYS
+      - /srv/oftalmocentervet/keys:/app/keys:ro
     networks:
-      - pocketbase_network
+      - proxy_net
+    depends_on:
+      pocketoftalmo:
+        condition: service_healthy
 
   finpet:
     image: zryyh/finpetsync:latest
     container_name: finpet-sync
     restart: unless-stopped
     env_file:
-      - .env # DEFINIR .env
+      - stack.env
+    networks:
+      - proxy_net
+    depends_on:
+      pocketoftalmo:
+        condition: service_healthy
+
+  pocketoftalmo:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: pocketoftalmo
+    restart: unless-stopped
     environment:
-      - POCKETBASE_URL=http://pocketbase:8090
-    networks:
-      - pocketbase_network
-
-  pocketbase:
-    image: zryyh/pocketbase:latest
-    container_name: pocketbase
-    restart: unless-stopped
+      PB_HOST: 0.0.0.0
+      PB_PORT: 8090
+      TZ: ${TZ}
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+      ENCRYPTION: ${PB_ENCRYPTION_KEY}
     volumes:
-      - pb_data:/pb/pb_data
-      - pb_public:/pb/pb_public
-    command: [ "/pb/pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb/pb_data", "--publicDir=/pb/pb_public" ]
+      - pocketbase_data:/pb_data
+      - pocketbase_public:/pb_public
+      - pocketbase_hooks:/pb_hooks
+    command: [ "--encryptionEnv", "ENCRYPTION" ]
     networks:
-      - pocketbase_network
-
-  nginx-proxy-manager:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: nginx-proxy-manager
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:81:81"
-      - "80:80"
-      - "443:443"
-    volumes:
-      - npm_data:/data
-      - npm_letsencrypt:/etc/letsencrypt
-    networks:
-      - pocketbase_network
+      - proxy_net
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
-  metabase_data:
+  pocketbase_data:
     driver: local
-  pb_data:
+  pocketbase_public:
     driver: local
-  finpet_logs:
-    driver: local
-  pb_public:
-    driver: local
-  npm_data:
-    driver: local
-  npm_letsencrypt:
+  pocketbase_hooks:
     driver: local
 
 networks:
-  pocketbase_network:
-    driver: bridge
+  proxy_net:
+    external: true
+    name: ${NETWORK_NAME}

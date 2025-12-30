@@ -6,8 +6,8 @@ from pocketbase import PocketBase
 from config import (
     COLLECTION_CONCILIATIONS,
     POCKETBASE_URL,
-    POCKETBASE_EMAIL,
-    POCKETBASE_PASSWORD,
+    PB_ADMIN_EMAIL,
+    PB_ADMIN_PASSWORD,
 )
 from logger import log
 
@@ -17,7 +17,7 @@ class ConciliationRepository:
 
     def __init__(self):
         self.pb = PocketBase(POCKETBASE_URL)
-        self.pb.admins.auth_with_password(POCKETBASE_EMAIL, POCKETBASE_PASSWORD)
+        self.pb.admins.auth_with_password(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD)
         self.collection = self.pb.collection(COLLECTION_CONCILIATIONS)
 
     def find_by_id(self, id_c: str):
