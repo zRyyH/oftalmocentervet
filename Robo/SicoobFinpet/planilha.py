@@ -177,5 +177,5 @@ def gerar_relatorio(dados: dict, mes: int, ano: int) -> str | None:
     if not itens:
         return None
     itens = ordenar_por_data(itens)
-    caminho = f"sicoob_lancamento_{mes:02d}_{ano}.xlsx"
+    caminho = f"relatorios/sicoob_lancamento_{mes:02d}_{ano}.xlsx"
     return criar_planilha(itens, caminho)

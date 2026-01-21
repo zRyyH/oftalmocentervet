@@ -5,7 +5,9 @@ from collections import defaultdict
 from datetime import datetime
 
 
-def criar_planilha(resultado: list, caminho: str = "finpet_conciliacoes.xlsx"):
+def criar_planilha(
+    resultado: list, caminho: str = "relatorios/finpet_conciliacoes.xlsx"
+):
     wb = Workbook()
     wb.remove(wb.active)
 

@@ -4,7 +4,7 @@ import json
 
 
 def executar_sicoob_releases(
-    dados: dict, caminho: str = "sicoob_lancamentos.xlsx"
+    dados: dict, caminho: str = "relatorios/sicoob_lancamentos.xlsx"
 ) -> dict:
     resultado = conciliar(dados)
     itens = resultado.get("itens", [])

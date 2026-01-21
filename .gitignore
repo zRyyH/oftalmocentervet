@@ -16,6 +16,7 @@
 .ruff_cache/
 **/.venv
 **/main.spec
+**/*.xlsx
 
 # Certificados e chaves
 **/*.crt

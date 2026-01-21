@@ -3,7 +3,11 @@ from FinpetSimplesvet import executar_finpet_lancamentos
 from SicoobReleases import executar_sicoob_releases
 from SicoobFinpet import executar_sicoob_finpet
 from service import get_data
+from pathlib import Path
 import os
+
+
+Path("./relatorios").mkdir(exist_ok=True)
 
 
 def limpar_tela():
