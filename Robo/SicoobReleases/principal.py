@@ -3,10 +3,10 @@ from .conciliador import conciliar
 
 
 def executar_sicoob_releases(dados):
-    resultado = conciliar(dados)
-    itens = resultado.get("itens", [])
+    dados_brutos = conciliar(dados)
+    resultado = dados_brutos.get("itens", [])
 
-    if itens:
-        criar_planilha(itens, "Relatorios/Sicoob Lançamentos.xlsx")
+    if resultado:
+        criar_planilha(resultado, "Relatorios/Sicoob Lançamentos.xlsx")
 
     return resultado

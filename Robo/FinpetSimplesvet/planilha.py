@@ -46,6 +46,7 @@ HEADER_FILL = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="s
 ROW_FILL = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
 VAZIO_FILL = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
 FONTE_VERMELHA = Font(color="CC0000", bold=True)
+FONTE_AZUL = Font(color="0000CC", bold=True)
 BORDA = Border(
     left=Side(style="thin", color="808080"),
     right=Side(style="thin", color="808080"),
@@ -66,9 +67,15 @@ def _adicionar_linha(ws, item):
         if not matches.get(match_key, True):
             ws.cell(row=row_idx, column=col_idx).font = FONTE_VERMELHA
 
-    # Valor Simplesvet vermelho quando exact_value é False
-    if not item.get("exact_value", True):
-        ws.cell(row=row_idx, column=8).font = FONTE_VERMELHA
+    # Cor do Valor Simplesvet (coluna 8)
+    exact = item.get("exact_value", True)
+    approximate = item.get("approximate_value", True)
+    
+    if not exact:
+        if approximate:
+            ws.cell(row=row_idx, column=8).font = FONTE_AZUL
+        else:
+            ws.cell(row=row_idx, column=8).font = FONTE_VERMELHA
 
     for col_idx, valor in enumerate(linha, 1):
         if valor is None or valor == "":

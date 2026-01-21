@@ -52,6 +52,9 @@ def _encontrar_melhor_match(
 
         match = calcular_match(fp, release)
 
+        if not match:
+            continue
+
         if melhor is None or match["score"] > melhor["score"]:
             melhor = {
                 "idx": idx,

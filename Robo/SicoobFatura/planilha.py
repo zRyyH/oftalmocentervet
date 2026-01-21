@@ -63,6 +63,84 @@ def ajustar_larguras(ws):
         ws.column_dimensions[get_column_letter(col)].width = min(max_len + 2, 50)
 
 
+def aplicar_linha_resumo(ws, linha, label, valor, formato=None, destaque=False, cor_fundo=None):
+    ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=3)
+    ws.merge_cells(start_row=linha, start_column=4, end_row=linha, end_column=6)
+    
+    cell_label = ws.cell(row=linha, column=1, value=label)
+    cell_label.font = Font(bold=True, size=12 if destaque else 11)
+    cell_label.alignment = Alignment(horizontal="right", vertical="center")
+    cell_label.border = BORDA
+    
+    cell_valor = ws.cell(row=linha, column=4, value=valor)
+    cell_valor.font = Font(bold=True, size=12 if destaque else 11)
+    cell_valor.alignment = Alignment(horizontal="center", vertical="center")
+    cell_valor.border = BORDA
+    if formato:
+        cell_valor.number_format = formato
+    
+    cor = cor_fundo or COR_ZEBRA
+    for col in range(1, 7):
+        ws.cell(row=linha, column=col).fill = cor
+        ws.cell(row=linha, column=col).border = BORDA
+
+
+def criar_resumo(ws, linha_inicio, dados_mes, despesas):
+    valor_fatura = dados_mes["valor_fatura"]
+    total_despesas = dados_mes["total_despesas"]
+    diferenca = round(valor_fatura - total_despesas, 2)
+    tem_erro = abs(diferenca) > 0.01
+    
+    num_despesas = len(despesas)
+    valores = [d["valor"] for d in despesas if d["valor"]]
+    maior_despesa = max(valores) if valores else 0
+    menor_despesa = min(valores) if valores else 0
+    media_despesa = sum(valores) / len(valores) if valores else 0
+    fornecedores = set(d["fornecedor"].strip() for d in despesas if d["fornecedor"].strip())
+    
+    linha = linha_inicio + 2
+    
+    # Título
+    ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=6)
+    cell_titulo = ws.cell(row=linha, column=1, value="📊 RESUMO DA FATURA")
+    cell_titulo.font = Font(bold=True, size=14)
+    cell_titulo.fill = COR_CABECALHO
+    cell_titulo.alignment = Alignment(horizontal="center", vertical="center")
+    for col in range(1, 7):
+        ws.cell(row=linha, column=col).border = BORDA
+        ws.cell(row=linha, column=col).fill = COR_CABECALHO
+    linha += 1
+    
+    # Dados
+    aplicar_linha_resumo(ws, linha, "Nº de Despesas", num_despesas)
+    linha += 1
+    aplicar_linha_resumo(ws, linha, "Nº de Fornecedores", len(fornecedores))
+    linha += 1
+    aplicar_linha_resumo(ws, linha, "Maior Despesa", maior_despesa, "R$ #,##0.00")
+    linha += 1
+    aplicar_linha_resumo(ws, linha, "Menor Despesa", menor_despesa, "R$ #,##0.00")
+    linha += 1
+    aplicar_linha_resumo(ws, linha, "Média por Despesa", media_despesa, "R$ #,##0.00")
+    linha += 2
+    
+    # Totais
+    aplicar_linha_resumo(ws, linha, "TOTAL DESPESAS", total_despesas, "R$ #,##0.00", True, COR_CABECALHO)
+    linha += 1
+    aplicar_linha_resumo(ws, linha, "VALOR FATURA", valor_fatura, "R$ #,##0.00", True, COR_CABECALHO)
+    linha += 1
+    
+    cor_diff = COR_STATUS_ERRO if tem_erro else COR_STATUS_OK
+    aplicar_linha_resumo(ws, linha, "DIFERENÇA", diferenca, "R$ #,##0.00", True, cor_diff)
+    linha += 2
+    
+    # Status
+    status = "✅ FATURA CONFERIDA" if not tem_erro else "⚠️ VERIFICAR DIFERENÇA"
+    ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=6)
+    cell_status = ws.cell(row=linha, column=1, value=status)
+    cell_status.font = Font(bold=True, size=12, color="006400" if not tem_erro else "CC0000")
+    cell_status.alignment = Alignment(horizontal="center", vertical="center")
+
+
 def gerar_planilha_sicoob(dados, caminho_saida="Relatorios/Cartão De Credito.xlsx"):
     registros_por_mes = defaultdict(
         lambda: {"despesas": [], "valor_fatura": 0, "total_despesas": 0}
@@ -79,9 +157,7 @@ def gerar_planilha_sicoob(dados, caminho_saida="Relatorios/Cartão De Credito.xl
             registro = {
                 "data": formatar_data(desp.get("data", data_fatura)),
                 "descricao": desp.get("descricao", ""),
-                "fornecedor": desp.get("fornecedor", "").replace(
-                    "Cartão de crédito", ""
-                ),
+                "fornecedor": desp.get("fornecedor", "").replace("Cartão de crédito", ""),
                 "valor": formatar_valor(desp.get("valor")),
                 "parcela": desp.get("parcela", ""),
                 "vencimento": formatar_data(desp.get("vencimento", "")),
@@ -127,55 +203,10 @@ def gerar_planilha_sicoob(dados, caminho_saida="Relatorios/Cartão De Credito.xl
             ws.cell(row=linha_atual, column=4).number_format = "R$ #,##0.00"
             linha_atual += 1
 
-        # Resumo no final
-        linha_atual += 1
-        valor_fatura = dados_mes["valor_fatura"]
-        total_despesas = dados_mes["total_despesas"]
-        diferenca = round(valor_fatura - total_despesas, 2)
-        tem_erro = abs(diferenca) > 0.01
-
-        # Total Despesas
-        cell_label = ws.cell(row=linha_atual, column=3, value="TOTAL DESPESAS:")
-        cell_label.font = Font(bold=True, size=14)
-        cell_label.alignment = Alignment(horizontal="right")
-
-        cell_valor = ws.cell(row=linha_atual, column=4, value=total_despesas)
-        cell_valor.font = Font(bold=True, size=14)
-        cell_valor.number_format = "R$ #,##0.00"
-        cell_valor.alignment = Alignment(horizontal="center")
-
-        linha_atual += 1
-
-        # Valor Fatura
-        cell_label = ws.cell(row=linha_atual, column=3, value="VALOR FATURA:")
-        cell_label.font = Font(bold=True, size=14)
-        cell_label.alignment = Alignment(horizontal="right")
-
-        cell_valor = ws.cell(row=linha_atual, column=4, value=valor_fatura)
-        cell_valor.font = Font(bold=True, size=14)
-        cell_valor.number_format = "R$ #,##0.00"
-        cell_valor.alignment = Alignment(horizontal="center")
-
-        linha_atual += 1
-
-        # Diferença
-        cell_label = ws.cell(row=linha_atual, column=3, value="DIFERENÇA:")
-        cell_label.font = Font(
-            bold=True, size=14, color="CC0000" if tem_erro else "006400"
-        )
-        cell_label.alignment = Alignment(horizontal="right")
-
-        cell_valor = ws.cell(row=linha_atual, column=4, value=diferenca)
-        cell_valor.font = Font(
-            bold=True, size=14, color="CC0000" if tem_erro else "006400"
-        )
-        cell_valor.number_format = "R$ #,##0.00"
-        cell_valor.alignment = Alignment(horizontal="center")
-        cell_valor.fill = COR_STATUS_ERRO if tem_erro else COR_STATUS_OK
-
+        criar_resumo(ws, linha_atual, dados_mes, despesas)
         ajustar_larguras(ws)
         ws.freeze_panes = "A2"
-        ws.auto_filter.ref = f"A1:F{linha_atual - 4}"
+        ws.auto_filter.ref = f"A1:F{linha_atual - 1}"
 
     wb.save(caminho_saida)
     return caminho_saida

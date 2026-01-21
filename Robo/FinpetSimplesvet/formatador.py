@@ -46,6 +46,7 @@ def extrair_linha(item):
         "pedidos": ", ".join(pedidos) if pedidos else "",
         "cliente_release": comp.get("cliente", {}).get("release"),
         "exact_value": comp.get("valor", {}).get("exact_value", True),
+        "approximate_value": comp.get("valor", {}).get("approximate_value", True),
         "matches": {
             "parcela": comp.get("parcela", {}).get("match", True),
             "valor": comp.get("valor", {}).get("match", True),

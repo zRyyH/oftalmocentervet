@@ -30,6 +30,10 @@ def calcular_match(finpet: dict, release: dict) -> dict:
     comp["data"] = _comparar_data(finpet, release)
     comp["auth"] = _comparar_auth(finpet, descricao, is_supplier)
 
+    # Falha catastrófica: diferença de valor > 3 descarta o match
+    if not comp["valor"]["match"]:
+        return None
+
     for campo in ["parcela", "valor", "data", "auth"]:
         if comp[campo]["match"]:
             score += 1
@@ -101,13 +105,14 @@ def _comparar_parcela(finpet: dict, release: dict, is_supplier: bool) -> dict:
 def _comparar_valor(finpet: dict, release: dict) -> dict:
     v1 = normalizar_valor(finpet.get("value"))
     v2 = normalizar_valor(release.get("valor"))
+
     return {
         "finpet": finpet.get("value"),
         "release": release.get("valor"),
         "exact_value": abs(v1 - v2) == 0,
+        "approximate_value": abs(v1 - v2) <= 0.03,
         "match": abs(v1 - v2) <= 3.00,
     }
-
 
 def _comparar_data(finpet: dict, release: dict) -> dict:
     d_estimada = normalizar_data(finpet.get("date_estimated"))
@@ -125,9 +130,16 @@ def _comparar_data(finpet: dict, release: dict) -> dict:
 def _comparar_auth(finpet: dict, descricao: str, is_supplier: bool) -> dict:
     auth_fp = (finpet.get("authorization_number") or "").upper()
     auths_release = extrair_auth_codes(descricao)
+    
+    if is_supplier:
+        return {
+            "finpet": auth_fp or None,
+            "release": "-",
+            "auths_encontrados": auths_release,
+            "match": True,
+        }
 
-    auth_match = is_supplier or (auth_fp and auth_fp in auths_release)
-
+    auth_match = auth_fp and auth_fp in auths_release
     return {
         "finpet": auth_fp or None,
         "release": auth_fp if auth_match else None,
