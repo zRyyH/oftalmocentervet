@@ -1,5 +1,3 @@
-"""Configurações da aplicação."""
-
 from os import getenv
 from dotenv import load_dotenv
 
@@ -13,5 +11,4 @@ COLLECTION_FINPET = getenv("COLLECTION_FINPET", "finpet")
 FINPET_EMAIL = getenv("FINPET_EMAIL")
 FINPET_PASSWORD = getenv("FINPET_PASSWORD")
 
-DAYS_RANGE = int(getenv("DAYS_RANGE", "5"))
 SYNC_INTERVAL_MINUTES = int(getenv("SYNC_INTERVAL_MINUTES", "30"))

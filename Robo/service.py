@@ -1,4 +1,8 @@
-from settings.config import POCKETBASE_EMAIL, POCKETBASE_PASSWORD, POCKETBASE_URL
+from config import (
+    POCKETBASE_EMAIL,
+    POCKETBASE_PASSWORD,
+    POCKETBASE_URL,
+)
 from pocketbase import PocketBase
 import json
 
@@ -40,9 +44,8 @@ def serialize_items(items):
     return json.loads(json.dumps(items_dict, default=str))
 
 
-def get_data(limit=None):
+def get_data(limit=None, collections=[]):
     pb = PocketBaseClient()
-    collections = ["releases", "finpet"]
 
     data = {}
     for name in collections:

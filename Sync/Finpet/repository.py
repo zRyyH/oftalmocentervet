@@ -2,16 +2,11 @@
 
 from pocketbase import PocketBase
 
-from config import (
-    COLLECTION_FINPET,
-    POCKETBASE_URL,
-    PB_ADMIN_EMAIL,
-    PB_ADMIN_PASSWORD,
-)
+from config import COLLECTION_FINPET, POCKETBASE_URL, PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD
 from logger import log
 
 
-class FinpetRepository:
+class Repository:
     """Gerencia operações na collection finpet."""
 
     def __init__(self):
@@ -19,68 +14,51 @@ class FinpetRepository:
         self.pb.admins.auth_with_password(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD)
         self.collection = self.pb.collection(COLLECTION_FINPET)
 
-    def find_by_id_t(self, id_t: str):
-        """Busca transação por id_t. Retorna o registro ou None."""
-        result = self.collection.get_list(1, 1, {"filter": f'id_t = "{id_t}"'})
-        return result.items[0] if result.items else None
+    def truncate(self):
+        """Limpa todos os registros da collection."""
+        self.pb.send(
+            f"/api/collections/{COLLECTION_FINPET}/truncate", {"method": "DELETE"}
+        )
+        log.info("Collection limpa via truncate")
 
-    def _normalize(self, value):
-        """Normaliza valor para comparação."""
-        from datetime import datetime
+    def batch_create(self, transactions: list[dict]) -> dict:
+        """Cria múltiplos registros de uma vez. Retorna estatísticas."""
+        stats = {"created": 0, "errors": 0}
 
-        if value is None or value == "":
-            return None
+        if not transactions:
+            return stats
 
-        if isinstance(value, str):
-            for fmt in (
-                "%Y-%m-%dT%H:%M:%S",
-                "%Y-%m-%d %H:%M:%S",
-                "%Y-%m-%dT%H:%M:%S.%fZ",
-                "%Y-%m-%d %H:%M:%S.%fZ",
-                "%Y-%m-%dT%H:%M:%SZ",
-                "%Y-%m-%d",
-            ):
-                try:
-                    return datetime.strptime(value, fmt)
-                except ValueError:
-                    continue
+        requests = [
+            {
+                "method": "POST",
+                "url": f"/api/collections/{COLLECTION_FINPET}/records",
+                "body": t,
+            }
+            for t in transactions
+        ]
 
-        return value
-
-    def get_changes(self, existing, new: dict) -> dict:
-        """Retorna campos alterados: {campo: (antes, depois)}."""
-        changes = {}
-        for key, value in new.items():
-            old_value = getattr(existing, key, None)
-            if self._normalize(old_value) != self._normalize(value):
-                changes[key] = (old_value, value)
-        return changes
-
-    def sync(self, transactions: list[dict]) -> dict:
-        """Sincroniza transações. Retorna estatísticas."""
-        stats = {"created": 0, "updated": 0, "skipped": 0, "errors": 0}
-
-        for t in transactions:
+        batch_size = 10000
+        for i in range(0, len(requests), batch_size):
+            batch = requests[i : i + batch_size]
             try:
-                existing = self.find_by_id_t(t["id_t"])
-
-                if existing:
-                    changes = self.get_changes(existing, t)
-                    if changes:
-                        self.collection.update(existing.id, t)
-                        stats["updated"] += 1
-                        log.info(f"Atualizada: {t['id_t']}")
-                        for campo, (antes, depois) in changes.items():
-                            log.info(f"  {campo}: {antes!r} → {depois!r}")
+                response = self.pb.send(
+                    "/api/batch", {"method": "POST", "body": {"requests": batch}}
+                )
+                for result in response:
+                    if result.get("status", 0) == 200:
+                        stats["created"] += 1
                     else:
-                        stats["skipped"] += 1
-                else:
-                    self.collection.create(t)
-                    stats["created"] += 1
-                    log.info(f"Nova transação: {t['id_t']}")
-
+                        stats["errors"] += 1
             except Exception as e:
-                stats["errors"] += 1
-                log.error(f"Falha {t['id_t']}: {e}")
+                log.error(f"Erro no batch {i // batch_size + 1}: {e}")
+                stats["errors"] += len(batch)
 
         return stats
+
+    def sync(self, transactions: list[dict]) -> dict:
+        """Limpa collection e recria todos os registros."""
+        if not transactions:
+            return {"created": 0, "errors": 0}
+
+        self.truncate()
+        return self.batch_create(transactions)

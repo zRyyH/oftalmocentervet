@@ -1,53 +1,44 @@
-from browser import BrowserManager
-from date_utils import format_period
+"""Scrapper para buscar dados do Finpet."""
+
+from urllib.parse import quote
+from datetime import datetime
+from playwright.sync_api import sync_playwright
 
 
-class FinpetScrapper:
-    """Scrapper para o sistema Finpet/Evoluservices."""
+def scrape(email: str, password: str, inicio: str, fim: str) -> list:
+    """Busca transações do Finpet no período especificado."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True, args=["--disable-blink-features=AutomationControlled"]
+        )
+        page = browser.new_page(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080},
+            locale="pt-BR",
+        )
 
-    BASE_URL = "https://app.evoluservices.com"
+        # Login
+        page.goto("https://app.evoluservices.com")
+        page.locator("#j_username").fill(email)
+        page.locator("#j_password").fill(password)
+        page.get_by_role("button", name="Fazer login").click()
+        page.wait_for_load_state("networkidle")
 
-    def __init__(self, email: str, password: str):
-        self._email = email
-        self._password = password
-        self._browser = BrowserManager()
+        # Busca recebimentos
+        def fmt(d):
+            return datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m/%Y")
 
-    @property
-    def _page(self):
-        return self._browser.page
+        periodo = quote(f"{fmt(inicio)} 00:00:00;{fmt(fim)} 23:59:59")
+        url = f"https://app.evoluservices.com/merchant/payments/search?searchInput.period={periodo}&limit=1000&start=0"
 
-    def login(self):
-        """Realiza login no sistema."""
-        self._page.goto(self.BASE_URL)
-        self._page.locator("#j_username").fill(self._email)
-        self._page.locator("#j_password").fill(self._password)
-        self._page.get_by_role("button", name="Fazer login").click()
-        self._page.wait_for_load_state("networkidle")
+        with page.expect_response(lambda r: "payments/search" in r.url) as resp:
+            page.goto(url)
 
-    def get_receipts(self, start_date: str, end_date: str, limit: int = 1000) -> dict:
-        """Obtém recebimentos do período especificado.
+        data = resp.value.json()
+        browser.close()
 
-        Args:
-            start_date: Data inicial (YYYY-MM-DD ou DD/MM/YYYY)
-            end_date: Data final (YYYY-MM-DD ou DD/MM/YYYY)
-            limit: Número máximo de registros
-
-        Returns:
-            Dados dos recebimentos em formato JSON
-        """
-        period = format_period(start_date, end_date)
-        url = f"{self.BASE_URL}/merchant/payments/search?searchInput.period={period}&limit={limit}&start=0"
-
-        with self._page.expect_response(
-            lambda r: "payments/search" in r.url
-        ) as response:
-            self._page.goto(url)
-
-        return response.value.json()
-
-    def __enter__(self):
-        self._browser.start()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._browser.stop()
+        return (
+            data.get("merchantPaymentSearchDTO", {})
+            .get("paymentList", {})
+            .get("list", [])
+        )

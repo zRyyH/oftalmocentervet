@@ -1,47 +1,52 @@
-from browser import BrowserManager
-from date_utils import format_conciliation_url
+"""Busca dados do SimplesVet."""
+
+from playwright.sync_api import sync_playwright
+from urllib.parse import urlencode
 
 
-class SimplesvetScrapper:
-    """Scrapper para o sistema SimplesVet."""
+def buscar_conciliacoes(
+    email: str, password: str, data_inicio: str, data_fim: str
+) -> dict:
+    """Busca conciliações do SimplesVet.
 
-    BASE_URL = "https://app.simples.vet/login/login.php"
+    Args:
+        email: Email de login
+        password: Senha
+        data_inicio: Data inicial (YYYY-MM-DD)
+        data_fim: Data final (YYYY-MM-DD)
 
-    def __init__(self, email: str, password: str):
-        self._email = email
-        self._password = password
-        self._browser = BrowserManager()
+    Returns:
+        Dados das conciliações em dict
+    """
+    params = {
+        "periodo": f"{data_inicio}|{data_fim}",
+        "data[after]": data_inicio,
+        "data[before]": data_fim,
+        "periodoObj": f'{{"inicio":"{data_inicio}","fim":"{data_fim}"}}',
+        "_pagina": 1,
+        "_porPagina": 10000,
+        "_ordenarPor[data]": "ASC",
+    }
+    url = f"https://api.simples.vet/app/v3/financeiro/conciliacao-cartoes?{urlencode(params)}"
 
-    @property
-    def _page(self):
-        return self._browser.page
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+            viewport={"width": 1920, "height": 1080},
+        )
 
-    def login(self):
-        """Realiza login no SimplesVet."""
-        self._page.goto(self.BASE_URL)
+        # Login
+        page.goto("https://app.simples.vet/login/login.php")
+        page.get_by_role("textbox", name="Email").fill(email)
+        page.get_by_role("textbox", name="Senha").fill(password)
+        page.get_by_role("button", name="Entrar no SimplesVet").click()
+        page.wait_for_load_state("networkidle")
 
-        self._page.get_by_role("textbox", name="Email").fill(self._email)
-        self._page.get_by_role("textbox", name="Senha").fill(self._password)
-        self._page.get_by_role("button", name="Entrar no SimplesVet").click()
-        self._page.wait_for_load_state("networkidle")
+        # Busca dados
+        response = page.request.get(url)
+        dados = response.json()
 
-    def get_conciliations(self, start_date: str, end_date: str) -> dict:
-        """Obtém conciliações do período especificado.
+        browser.close()
 
-        Args:
-            start_date: Data inicial (YYYY-MM-DD)
-            end_date: Data final (YYYY-MM-DD)
-
-        Returns:
-            Dados das conciliações em formato JSON
-        """
-        url = format_conciliation_url(start_date, end_date)
-        response = self._page.request.get(url)
-        return response.json()
-
-    def __enter__(self):
-        self._browser.start()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._browser.stop()
+    return dados

@@ -2,22 +2,30 @@
 
 import time
 import schedule
+from datetime import datetime, timedelta
 
-from datetime import datetime
-from config import SYNC_INTERVAL_MINUTES
-from repository import FinpetRepository
-from service import fetch_transactions
+from config import SYNC_INTERVAL_MINUTES, FINPET_EMAIL, FINPET_PASSWORD
+from repository import Repository
+from parser import parse_all
+from scrapper import scrape
 from logger import log
 
 
 def sync():
     hoje = datetime.now()
+    inicio = (hoje - timedelta(days=60)).strftime("%Y-%m-%d")
+    fim = (hoje + timedelta(days=60)).strftime("%Y-%m-%d")
 
-    transactions = fetch_transactions(hoje=hoje)
-    stats = FinpetRepository().sync(transactions)
+    log.info("Buscando dados do Finpet...")
+    dados = scrape(FINPET_EMAIL, FINPET_PASSWORD, inicio, fim)
+
+    log.info(f"Encontrados {len(dados)} registros. Sincronizando...")
+    transactions = parse_all(dados)
+    stats = Repository().sync(transactions)
 
     log.info(
-        f"Syncronizado: {stats['created']} | Atualizado: {stats['updated']} Erro: {stats['errors']} | Data: {hoje}"
+        f"Criados: {stats['created']} | Erros: {stats['errors']} | "
+        f"Data: {hoje.strftime('%Y-%m-%d %H:%M')}"
     )
 
 

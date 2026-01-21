@@ -1,44 +1,75 @@
-"""Sincroniza extrato bancário com PocketBase."""
+"""Sync Sicoob -> PocketBase."""
 
 import time
 import schedule
-from datetime import date
+from datetime import date, timedelta
 
-from repository import ExtratoRepository
-from parser import parse_transactions
-from api import get_extrato
-from config import SYNC_INTERVAL_MINUTES
+import config
+from scrapper import get_extrato
+from repository import Repository
 from logger import log
 
 
-def sync():
+def parse(raw: dict) -> dict:
+    data = raw.get("data", "")
+    return {
+        "transaction_id": raw.get("transactionId"),
+        "tipo": raw.get("tipo"),
+        "valor": float(raw.get("valor") or 0),
+        "data": data.replace("T", " ") + ":00" if data else None,
+        "data_lote": raw.get("dataLote"),
+        "descricao": raw.get("descricao"),
+        "numero_documento": raw.get("numeroDocumento"),
+        "desc_inf_complementar": raw.get("descInfComplementar"),
+        "cpf_cnpj": raw.get("cpfCnpj"),
+    }
+
+
+def buscar_ultimos_60_dias() -> list[dict]:
+    """Busca extratos dos últimos 60 dias."""
     hoje = date.today()
-    repo = ExtratoRepository()
+    inicio = hoje - timedelta(days=60)
 
-    response = get_extrato(hoje.month, hoje.year)
-    if not response:
-        log.warning("Falha ao obter extrato")
-        return
+    # Identifica os meses no período
+    meses = set()
+    atual = inicio
+    while atual <= hoje:
+        meses.add((atual.month, atual.year))
+        atual += timedelta(days=28)
+    meses.add((hoje.month, hoje.year))
 
-    raw = response.get("resultado", {}).get("transacoes", [])
-    if not raw:
-        log.info("Nenhuma transação")
-        return
+    transacoes = []
+    for mes, ano in sorted(meses):
+        transacoes.extend(get_extrato(mes, ano))
+        log.info(f"Buscado {mes:02d}/{ano}")
 
-    transactions = parse_transactions(raw)
-    stats = repo.sync(transactions)
+    # Filtra só transações dentro do período
+    parsed = []
+    for t in transacoes:
+        p = parse(t)
+        if p["data"]:
+            data_tx = date.fromisoformat(p["data"][:10])
+            if inicio <= data_tx <= hoje:
+                parsed.append(p)
 
-    log.info("-" * 80)
-    log.info(
-        f"Syncronizado: {stats['created']} | Atualizado: {stats['updated']} Erro: {stats['errors']} | Data: {hoje}"
-    )
-    log.info("-" * 80)
+    return parsed
+
+
+def sync(repo: Repository):
+    """Truncate + insert de todos os registros."""
+    records = buscar_ultimos_60_dias()
+    created = repo.sync(records)
+    log.info(f"Sync: {created}/{len(records)} registros")
 
 
 def main():
-    log.info(f"Iniciado (intervalo: {SYNC_INTERVAL_MINUTES}min)")
-    sync()
-    schedule.every(SYNC_INTERVAL_MINUTES).minutes.do(sync)
+    log.info("Iniciado")
+    repo = Repository()
+
+    sync(repo)
+
+    schedule.every(config.SYNC_INTERVAL_MINUTES).minutes.do(sync, repo)
+    log.info(f"Agendado: cada {config.SYNC_INTERVAL_MINUTES} min")
 
     while True:
         schedule.run_pending()
