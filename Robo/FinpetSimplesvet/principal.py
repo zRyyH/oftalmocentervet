@@ -1,4 +1,4 @@
-from .relatorio import gerar_relatorio
+from .planilha import gerar_relatorio
 from .vinculador import vincular
 
 
@@ -7,7 +7,6 @@ def executar_finpet_lancamentos(dados):
     releases = dados.get("releases", [])
 
     resultado = vincular(finpet, releases)
-
     gerar_relatorio(resultado)
 
     return resultado
