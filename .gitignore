@@ -18,6 +18,7 @@
 **/main.spec
 **/*.xlsx
 **/*.exe
+**/*.md
 
 # Certificados e chaves
 **/*.crt
