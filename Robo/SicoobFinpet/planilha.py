@@ -171,7 +171,8 @@ def criar_planilha(itens, caminho):
     for chave in chaves_ordenadas:
         criar_folha(wb, chave, grupos[chave])
 
-    if "Sheet" in wb.sheetnames:
+    # Só remove a planilha padrão se outras planilhas foram criadas
+    if "Sheet" in wb.sheetnames and len(wb.sheetnames) > 1:
         del wb["Sheet"]
 
     wb.save(caminho)

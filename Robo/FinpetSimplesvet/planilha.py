@@ -1,8 +1,13 @@
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, PatternFill, Border, Side, Font
-from openpyxl.utils import get_column_letter
-from .formatador import preparar_dados, ordenar_meses
+import sys
+from pathlib import Path
 
+# Adiciona a raiz ao path para importar planilha
+raiz = Path(__file__).parent.parent
+if str(raiz) not in sys.path:
+    sys.path.insert(0, str(raiz))
+
+from planilha import criar_planilha
+from .formatador import preparar_dados, ordenar_meses
 
 HEADERS = [
     "Valor Finpet",
@@ -38,95 +43,62 @@ CAMPOS = [
     "cliente_release",
 ]
 
-# Colunas que verificam match (índice 1-based)
-COLUNAS_MATCH = {6: "parcela", 10: "data"}
 
-# Estilos
-HEADER_FILL = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
-ROW_FILL = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
-VAZIO_FILL = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
-FONTE_VERMELHA = Font(color="CC0000", bold=True)
-FONTE_AZUL = Font(color="0000CC", bold=True)
-BORDA = Border(
-    left=Side(style="thin", color="808080"),
-    right=Side(style="thin", color="808080"),
-    top=Side(style="thin", color="808080"),
-    bottom=Side(style="thin", color="808080"),
-)
-CENTRO = Alignment(horizontal="center", vertical="center")
-
-
-def _adicionar_linha(ws, item):
-    linha = [item.get(campo) for campo in CAMPOS]
-    ws.append(linha)
-
-    row_idx = ws.max_row
+def _preparar_item_para_planilha(item):
+    """Prepara item adicionando metadados de formatação para a planilha genérica."""
     matches = item.get("matches", {})
-
-    for col_idx, match_key in COLUNAS_MATCH.items():
-        if not matches.get(match_key, True):
-            ws.cell(row=row_idx, column=col_idx).font = FONTE_VERMELHA
-
-    # Cor do Valor Simplesvet (coluna 8)
     exact = item.get("exact_value", True)
     approximate = item.get("approximate_value", True)
-    
+
+    # Adiciona erros/avisos baseados nos matches
+    item["_erros"] = {}
+
+    # Parcela (coluna 6)
+    if not matches.get("parcela", True):
+        item["_erros"]["parcela_release"] = "erro"
+
+    # Data (coluna 10)
+    if not matches.get("data", True):
+        item["_erros"]["data_release"] = "erro"
+
+    # Valor Simplesvet (coluna 8) - lógica especial
     if not exact:
         if approximate:
-            ws.cell(row=row_idx, column=8).font = FONTE_AZUL
+            item["_erros"]["valor_release"] = "aviso"
         else:
-            ws.cell(row=row_idx, column=8).font = FONTE_VERMELHA
+            item["_erros"]["valor_release"] = "erro"
 
-    for col_idx, valor in enumerate(linha, 1):
-        if valor is None or valor == "":
-            ws.cell(row=row_idx, column=col_idx).fill = VAZIO_FILL
-
-
-def _aplicar_estilos(ws):
-    for cell in ws[1]:
-        cell.fill = HEADER_FILL
-
-    for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
-        if row_idx % 2 == 0:
-            for cell in row:
-                if not cell.fill.start_color.rgb.endswith("FFCCCC"):
-                    cell.fill = ROW_FILL
-
-    for row in ws.iter_rows():
-        for cell in row:
-            cell.alignment = CENTRO
-            cell.border = BORDA
-
-    for col_idx, col in enumerate(ws.columns, 1):
-        max_len = max((len(str(c.value or "")) for c in col), default=0)
-        ws.column_dimensions[get_column_letter(col_idx)].width = max_len + 2
-
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-
-
-def _criar_aba(wb, nome, linhas):
-    ws = wb.create_sheet(title=nome.replace("/", "-"))
-    ws.append(HEADERS)
-
-    for item in linhas:
-        _adicionar_linha(ws, item)
-
-    _aplicar_estilos(ws)
+    return item
 
 
 def gerar_relatorio(dados, caminho="Relatorios/Finpet Lancamentos.xlsx"):
+    """Gera relatório usando a função genérica criar_planilha."""
     dados_agrupados = preparar_dados(dados)
 
     if not dados_agrupados:
         print("\nNenhum registro encontrado.")
         return
 
-    wb = Workbook()
-    wb.remove(wb.active)
-
+    # Prepara todos os itens para a planilha
+    todos_dados = []
     for mes_ano in ordenar_meses(dados_agrupados.keys()):
-        _criar_aba(wb, mes_ano, dados_agrupados[mes_ano])
+        for item in dados_agrupados[mes_ano]:
+            item_preparado = _preparar_item_para_planilha(item.copy())
+            todos_dados.append(item_preparado)
 
-    wb.save(caminho)
+    # Configuração para a planilha genérica
+    config = {
+        "coluna_data": "data_estimada",
+        "colunas_moeda": [1, 7, 8],  # Valor Finpet, Valor Finpet 2, Valor Simplesvet
+        "marcar_vazios": True,
+    }
+
+    criar_planilha(
+        dados=todos_dados,
+        arquivo=caminho,
+        headers=HEADERS,
+        campos=CAMPOS,
+        config=config
+    )
+
     return caminho

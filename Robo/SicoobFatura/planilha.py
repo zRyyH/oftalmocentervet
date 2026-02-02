@@ -1,8 +1,15 @@
+import sys
+from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from datetime import datetime
 from collections import defaultdict
+
+# Adiciona o diretório raiz ao path para importar utils
+root_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(root_dir))
+
+from utils import extrair_mes_ano, formatar_data as formatar_data_utils
 
 
 COR_CABECALHO = PatternFill("solid", fgColor="90EE90")
@@ -19,23 +26,9 @@ BORDA = Border(
 COLUNAS = ["Data", "Descrição", "Fornecedor", "Valor", "Parcela", "Vencimento"]
 
 
-def extrair_mes_ano(data_str):
-    try:
-        if "T" in data_str or "Z" in data_str:
-            data_str = data_str[:10]
-        dt = datetime.strptime(data_str[:10], "%Y-%m-%d")
-        return dt.strftime("%m-%Y")
-    except:
-        return None
-
-
 def formatar_data(data_str):
-    try:
-        if data_str and len(data_str) >= 10:
-            return datetime.strptime(data_str[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-    except:
-        pass
-    return data_str or ""
+    """Wrapper para formatar data no formato brasileiro."""
+    return formatar_data_utils(data_str, formato_saida="%d/%m/%Y")
 
 
 def formatar_valor(valor):

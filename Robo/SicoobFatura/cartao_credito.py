@@ -1,4 +1,11 @@
-from datetime import datetime
+import sys
+from pathlib import Path
+
+# Adiciona o diretório raiz ao path para importar utils
+root_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(root_dir))
+
+from utils import parse_data
 
 
 def obter_faturas_cartao(dados: dict) -> list:
@@ -11,10 +18,10 @@ def obter_faturas_cartao(dados: dict) -> list:
     resultado = []
     for fatura in faturas_ordenadas:
         data_str = fatura.get("data", "")
-        try:
-            data_fatura = datetime.fromisoformat(data_str.replace("Z", "")).date()
-        except:
+        data_fatura_dt = parse_data(data_str)
+        if not data_fatura_dt:
             continue
+        data_fatura = data_fatura_dt.date()
 
         despesas_periodo = []
         for r in releases:
@@ -26,10 +33,10 @@ def obter_faturas_cartao(dados: dict) -> list:
                 continue
 
             r_data_str = r.get("data", "")
-            try:
-                r_data = datetime.fromisoformat(r_data_str.replace("Z", "")).date()
-            except:
+            r_data_dt = parse_data(r_data_str)
+            if not r_data_dt:
                 continue
+            r_data = r_data_dt.date()
 
             if r_data == data_fatura:
                 despesas_periodo.append(r)

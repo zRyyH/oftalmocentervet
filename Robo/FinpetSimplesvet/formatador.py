@@ -1,28 +1,13 @@
-from datetime import datetime
-from collections import defaultdict
+import sys
+from pathlib import Path
 
+# Adiciona a raiz ao path para importar utils
+raiz = Path(__file__).parent.parent
+if str(raiz) not in sys.path:
+    sys.path.insert(0, str(raiz))
 
-def parse_data(valor):
-    if not valor or not isinstance(valor, str):
-        return None
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-        try:
-            return datetime.strptime(valor[:10], fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def formatar_data(valor):
-    return valor[:10] if isinstance(valor, str) and len(valor) >= 10 else None
-
-
-def extrair_mes_ano(valor):
-    if isinstance(valor, str) and len(valor) >= 7:
-        partes = valor[:10].split("-")
-        if len(partes) >= 2:
-            return f"{partes[1]}/{partes[0]}"
-    return None
+# Importa funções reutilizáveis do utils.py
+from utils import parse_data, formatar_data, extrair_mes_ano, ordenar_chaves_mes
 
 
 def extrair_linha(item):
@@ -58,6 +43,8 @@ def extrair_linha(item):
 
 
 def ordenar_dados(dados):
+    """Ordena dados por data estimada do finpet."""
+    from datetime import datetime
     return sorted(
         dados,
         key=lambda x: parse_data(x.get("finpet", {}).get("date_estimated"))
@@ -67,22 +54,19 @@ def ordenar_dados(dados):
 
 
 def agrupar_por_mes(dados):
+    """Agrupa dados por mês/ano baseado na data estimada."""
+    from collections import defaultdict
     grupos = defaultdict(list)
     for item in dados:
         data_str = item.get("comparacoes", {}).get("data", {}).get("finpet_estimated")
-        mes_ano = extrair_mes_ano(data_str) or "Sem Data"
+        mes_ano = extrair_mes_ano(data_str, formato="%m/%Y") or "Sem Data"
         grupos[mes_ano].append(extrair_linha(item))
     return grupos
 
 
 def ordenar_meses(meses):
-    def chave(m):
-        if m == "Sem Data":
-            return (9999, 99)
-        partes = m.split("/")
-        return (int(partes[1]), int(partes[0]))
-
-    return sorted(meses, key=chave)
+    """Ordena as chaves de mês/ano."""
+    return ordenar_chaves_mes(meses)
 
 
 def preparar_dados(dados):

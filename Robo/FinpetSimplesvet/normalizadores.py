@@ -1,4 +1,13 @@
 import re
+import sys
+from pathlib import Path
+
+# Adiciona a raiz ao path para importar utils
+raiz = Path(__file__).parent.parent
+if str(raiz) not in sys.path:
+    sys.path.insert(0, str(raiz))
+
+from utils import formatar_data as formatar_data_utils
 
 
 def normalizar_parcela(parcela: str) -> tuple:
@@ -31,7 +40,8 @@ def normalizar_valor(valor) -> float:
 
 
 def normalizar_data(data: str) -> str:
-    return data[:10] if data else None
+    """Normaliza data para formato YYYY-MM-DD usando função reutilizável."""
+    return formatar_data_utils(data, formato_saida="%Y-%m-%d") if data else None
 
 
 def normalizar_tipo(tipo_finpet: str) -> str:

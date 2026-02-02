@@ -1,8 +1,7 @@
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from collections import defaultdict
 from openpyxl import Workbook
-from datetime import datetime
+from utils import parse_data, agrupar_por_mes, ordenar_por_data, ordenar_chaves_mes
 import unicodedata
 
 
@@ -40,6 +39,8 @@ def criar_estilos():
         "sim_fill": PatternFill("solid", fgColor="C6EFCE"),
         "nao_fill": PatternFill("solid", fgColor="FFC7CE"),
         "fatura_fill": PatternFill("solid", fgColor="ADD8E6"),
+        "estorno_vinculado_fill": PatternFill("solid", fgColor="FFE4B5"),
+        "estorno_sem_par_fill": PatternFill("solid", fgColor="FFCCCC"),
         "borda": Border(left=borda, right=borda, top=borda, bottom=borda),
         "centro": Alignment(horizontal="center", vertical="center"),
         "esquerda": Alignment(horizontal="left", vertical="center"),
@@ -69,20 +70,32 @@ def aplicar_linha(ws, linha, estilos, item, zebra=False):
     conciliado = item.get("conciliado", False)
     match = item.get("match", True)
     is_fatura = eh_fatura(item)
+    estorno_vinculado = item.get("estorno_vinculado", False)
+    estorno_sem_par = item.get("estorno_sem_par", False)
+    forma_confere = item.get("forma_confere")
 
     for col in range(1, len(HEADERS) + 1):
         celula = ws.cell(row=linha, column=col)
         celula.border = estilos["borda"]
         celula.alignment = get_alinhamento(col, estilos)
 
-        if match is False:
+        # Coluna 6 é "Forma Pag. ERP" - vermelha se forma_confere é False
+        if col == 6 and forma_confere is False:
+            celula.font = estilos["cell_font_erro"]
+        elif match is False:
             celula.font = estilos["cell_font_erro"]
         else:
             celula.font = estilos["cell_font"]
 
-        if is_fatura:
+        # Prioridade: estorno_sem_par > estorno_vinculado > fatura > conciliado > zebra
+        if estorno_sem_par:
+            celula.fill = estilos["estorno_sem_par_fill"]
+        elif estorno_vinculado:
+            celula.fill = estilos["estorno_vinculado_fill"]
+        elif is_fatura:
             celula.fill = estilos["fatura_fill"]
-        elif col == 3:
+        elif col == 3 and not estorno_vinculado:
+            # Não aplica cor verde/vermelho na coluna 3 se for estorno vinculado
             celula.fill = estilos["sim_fill"] if conciliado else estilos["nao_fill"]
         elif zebra:
             celula.fill = estilos["alt_fill"]
@@ -103,7 +116,8 @@ def auto_ajustar_larguras(ws):
 
 def extrair_valores(item):
     is_fatura = eh_fatura(item)
-    
+    estorno_vinculado = item.get("estorno_vinculado", False)
+
     if is_fatura:
         return [
             item.get("data_sicoob", ""),
@@ -117,11 +131,17 @@ def extrair_valores(item):
             TEXTO_CARTAO,
             TEXTO_CARTAO,
         ]
-    
+
+    # Se é estorno vinculado, campo conciliado fica em branco
+    if estorno_vinculado:
+        status_conciliado = ""
+    else:
+        status_conciliado = "SIM" if item.get("conciliado") else "NÃO"
+
     return [
         item.get("data_sicoob", ""),
         item.get("data_erp") or "",
-        "SIM" if item.get("conciliado") else "NÃO",
+        status_conciliado,
         item.get("valor_sicoob"),
         item.get("valor_erp"),
         item.get("forma_pagamento_erp") or "",
@@ -132,42 +152,13 @@ def extrair_valores(item):
     ]
 
 
-def parse_data(valor):
-    if not valor:
-        return None
-    for fmt in ["%Y-%m-%d", "%d/%m/%Y"]:
-        try:
-            return datetime.strptime(valor, fmt)
-        except ValueError:
-            continue
-    return None
-
-
-def ordenar_por_data(itens):
-    return sorted(
-        itens,
-        key=lambda x: parse_data(x.get("data_sicoob", "")) or datetime.min,
-        reverse=True,
-    )
-
-
-def agrupar_por_mes(itens):
-    grupos = defaultdict(list)
-    for item in itens:
-        data = parse_data(item.get("data_sicoob", ""))
-        if data:
-            chave = (data.year, data.month)
-        else:
-            chave = (0, 0)
-        grupos[chave].append(item)
-    return grupos
 
 
 def criar_folha(wb, nome, itens, estilos):
     ws = wb.create_sheet(title=nome)
     aplicar_header(ws, estilos)
 
-    itens = ordenar_por_data(itens)
+    itens = ordenar_por_data(itens, campo_data="data_sicoob")
 
     for i, item in enumerate(itens, 2):
         valores = extrair_valores(item)
@@ -188,16 +179,11 @@ def criar_planilha(itens, caminho):
     wb = Workbook()
     estilos = criar_estilos()
 
-    grupos = agrupar_por_mes(itens)
-    chaves_ordenadas = sorted(grupos.keys())
+    grupos = agrupar_por_mes(itens, campo_data="data_sicoob")
+    chaves_ordenadas = ordenar_chaves_mes(grupos.keys())
 
     for chave in chaves_ordenadas:
-        if chave == (0, 0):
-            nome = "Sem Data"
-        else:
-            ano, mes = chave
-            nome = f"{mes:02d}-{ano}"
-        criar_folha(wb, nome, grupos[chave], estilos)
+        criar_folha(wb, chave, grupos[chave], estilos)
 
     if "Sheet" in wb.sheetnames:
         del wb["Sheet"]

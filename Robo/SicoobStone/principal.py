@@ -1,18 +1,18 @@
-from .normalizers import normalize_stone_sicoob_brands, processar_dados
-from .planilha import gerar_planilha_sicoob
+from .normalizers import normalizar_dados
 from .extract_data import extrair_dados
-from .conciliations import conciliar
-import json
+from .planilha import criar_planilha
+from .conciliador import conciliar
+from .vinculador import vincular
 
 
-def executar_sicoob_stone(dados):
-    dados.update({"stone": extrair_dados("Stone/extrato.xlsx")})
-    dados_normalizados = normalize_stone_sicoob_brands(dados)
-    dados_processados = processar_dados(dados_normalizados)
-    dados_conciliados = conciliar(dados_processados)
-    gerar_planilha_sicoob(dados_conciliados, "Relatorios/Sicoob Stone.xlsx")
+def executar_sicoob_stone(dados, caminho_stone="Stone/extrato.xlsx"):
+    dados["stone"] = extrair_dados(caminho_stone)
 
-    with open("Entradas/sicoob_stone.json", "w") as FileW:
-        FileW.write(json.dumps(dados_processados, indent=4))
+    norm = normalizar_dados(dados)
 
-    return dados_conciliados
+    vinculados = vincular(norm["sicoob"], norm["stone"], norm["brands"])
+    resultado = conciliar(vinculados)
+
+    criar_planilha(resultado, "Relatorios/Sicoob Stone.xlsx")
+
+    return resultado

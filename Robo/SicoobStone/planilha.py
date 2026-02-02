@@ -2,17 +2,21 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from collections import defaultdict
 from openpyxl import Workbook
+from datetime import datetime
 
 
-COR_HEADER_BG = "2E7D32"
-COR_HEADER_FONT = "FFFFFF"
-COR_ZEBRA = "E8F5E9"
-COR_BRANCO = "FFFFFF"
-COR_MATCH = "C8E6C9"
-COR_NAO_MATCH = "FFCDD2"
-COR_FONTE = "212121"
-COR_TOTAL_BG = "37474F"
-COR_TOTAL_FONT = "FFFFFF"
+HEADERS = [
+    "Data Sicoob",
+    "Data Stone",
+    "Conciliado",
+    "Valor Sicoob (R$)",
+    "Valor Stone (R$)",
+    "Descrição Sicoob",
+    "Info Complementar",
+    "Bandeira",
+]
+
+LARGURAS = [12, 12, 12, 16, 18, 35, 50, 18]
 
 BORDA = Border(
     left=Side(style="thin", color="000000"),
@@ -21,141 +25,236 @@ BORDA = Border(
     bottom=Side(style="thin", color="000000"),
 )
 
-
-def ajustar_largura_colunas(ws):
-    for col in ws.columns:
-        max_length = 0
-        col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            try:
-                val = str(cell.value) if cell.value else ""
-                max_length = max(max_length, len(val))
-            except:
-                pass
-        ws.column_dimensions[col_letter].width = max_length + 3
-
-
-def gerar_planilha_sicoob(dados, caminho_saida="sicoob_stone.xlsx"):
-    wb = Workbook()
-    wb.remove(wb.active)
-
-    registros = []
-    for r in dados.get("conciliados", []):
-        registros.append(r)
-    for r in dados.get("nao_conciliados", []):
-        registros.append(r)
-
-    por_mes = defaultdict(list)
-    for r in registros:
-        data_ref = r.get("data_sicoob") or r.get("data_stone") or ""
-        if data_ref:
-            mes = data_ref[5:7] + "-" + data_ref[:4]
-            por_mes[mes].append(r)
-
-    meses_ordenados = sorted(por_mes.keys(), key=lambda x: x[3:7] + x[:2])
-
-    cabecalhos = [
-        "Data Sicoob",
-        "Data Stone",
-        "Conciliado",
-        "Valor Sicoob (R$)",
-        "Valor Stone (R$)",
-        "Descrição Sicoob",
-        "Info Complementar",
-        "Bandeira",
-    ]
-    campos = [
-        "data_sicoob",
-        "data_stone",
-        "conciliado",
-        "valor_sicoob",
-        "valor_stone",
-        "descricao",
-        "desc_inf_complementar",
-        "bandeira",
-    ]
-
-    for mes in meses_ordenados:
-        ws = wb.create_sheet(title=mes)
-        regs = sorted(
-            por_mes[mes],
-            key=lambda x: x.get("data_sicoob") or x.get("data_stone") or "",
-            reverse=True,
-        )
-        _criar_aba(ws, cabecalhos, regs, campos)
-
-    wb.save(caminho_saida)
-    return caminho_saida
+ESTILOS = {
+    "header_font": Font(bold=True, size=11, color="FFFFFF"),
+    "header_fill": PatternFill("solid", fgColor="2E7D32"),
+    "cell_font": Font(size=10, color="212121"),
+    "zebra_fill": PatternFill("solid", fgColor="E8F5E9"),
+    "branco_fill": PatternFill("solid", fgColor="FFFFFF"),
+    "sim_fill": PatternFill("solid", fgColor="C8E6C9"),
+    "nao_fill": PatternFill("solid", fgColor="FFCDD2"),
+    "total_font": Font(bold=True, size=11, color="FFFFFF"),
+    "total_fill": PatternFill("solid", fgColor="37474F"),
+    "info_font": Font(bold=True, size=10, color="000000"),
+    "info_fill": PatternFill("solid", fgColor="FFE082"),
+    "centro": Alignment(horizontal="center", vertical="center"),
+}
 
 
-def _criar_aba(ws, cabecalhos, registros, campos):
-    header_font = Font(bold=True, size=11, color=COR_HEADER_FONT)
-    header_fill = PatternFill("solid", fgColor=COR_HEADER_BG)
-    alinhamento = Alignment(horizontal="center", vertical="center")
-
-    for col, texto in enumerate(cabecalhos, 1):
-        cel = ws.cell(row=1, column=col, value=texto)
-        cel.font = header_font
-        cel.fill = header_fill
-        cel.alignment = alinhamento
+def aplicar_header(ws):
+    for col, nome in enumerate(HEADERS, 1):
+        cel = ws.cell(row=1, column=col, value=nome)
+        cel.font = ESTILOS["header_font"]
+        cel.fill = ESTILOS["header_fill"]
+        cel.alignment = ESTILOS["centro"]
         cel.border = BORDA
 
-    data_font = Font(size=10, color=COR_FONTE)
-    fill_zebra = PatternFill("solid", fgColor=COR_ZEBRA)
-    fill_branco = PatternFill("solid", fgColor=COR_BRANCO)
-    fill_match = PatternFill("solid", fgColor=COR_MATCH)
-    fill_nao = PatternFill("solid", fgColor=COR_NAO_MATCH)
 
+def aplicar_linha(ws, linha, conciliado, zebra=False):
+    for col in range(1, len(HEADERS) + 1):
+        cel = ws.cell(row=linha, column=col)
+        cel.font = ESTILOS["cell_font"]
+        cel.alignment = ESTILOS["centro"]
+        cel.border = BORDA
+
+        if col == 3:
+            cel.fill = ESTILOS["sim_fill"] if conciliado else ESTILOS["nao_fill"]
+        else:
+            cel.fill = ESTILOS["zebra_fill"] if zebra else ESTILOS["branco_fill"]
+
+        if col in [4, 5]:
+            cel.number_format = "R$ #,##0.00"
+
+
+def aplicar_totais(ws, linha, total_sicoob, total_stone):
+    for col in range(1, len(HEADERS) + 1):
+        cel = ws.cell(row=linha, column=col)
+        cel.font = ESTILOS["total_font"]
+        cel.fill = ESTILOS["total_fill"]
+        cel.alignment = ESTILOS["centro"]
+        cel.border = BORDA
+
+    ws.cell(row=linha, column=1, value="TOTAL")
+    ws.cell(row=linha, column=4, value=total_sicoob).number_format = "R$ #,##0.00"
+    ws.cell(row=linha, column=5, value=total_stone).number_format = "R$ #,##0.00"
+
+
+def aplicar_area_informacoes(ws, linha_inicio, total_registros, total_especiais, qtd_especiais):
+    # Linha em branco para separação
+    linha_inicio += 2
+
+    # Cabeçalho da área de informações - ocupa todas as colunas
+    for col in range(1, len(HEADERS) + 1):
+        cel = ws.cell(row=linha_inicio, column=col)
+        cel.font = ESTILOS["header_font"]
+        cel.fill = PatternFill("solid", fgColor="1565C0")
+        cel.alignment = ESTILOS["centro"]
+        cel.border = BORDA
+    ws.cell(row=linha_inicio, column=1, value="RESUMO GERAL")
+    ws.merge_cells(f"A{linha_inicio}:{get_column_letter(len(HEADERS))}{linha_inicio}")
+
+    # Linha: Total de registros
+    linha_inicio += 1
+    for col in range(1, len(HEADERS) + 1):
+        cel = ws.cell(row=linha_inicio, column=col)
+        cel.border = BORDA
+        if col <= 4:
+            cel.fill = PatternFill("solid", fgColor="E3F2FD")
+        else:
+            cel.fill = ESTILOS["branco_fill"]
+
+    ws.cell(row=linha_inicio, column=1, value="Total de Registros:")
+    ws.cell(row=linha_inicio, column=1).font = Font(bold=True, size=10, color="1565C0")
+    ws.cell(row=linha_inicio, column=1).alignment = Alignment(horizontal="left", vertical="center")
+    ws.merge_cells(f"A{linha_inicio}:C{linha_inicio}")
+
+    ws.cell(row=linha_inicio, column=4, value=total_registros)
+    ws.cell(row=linha_inicio, column=4).font = Font(bold=True, size=10, color="000000")
+    ws.cell(row=linha_inicio, column=4).alignment = ESTILOS["centro"]
+
+    # Linha: Registros STONECODE 111222201
+    linha_inicio += 1
+    for col in range(1, len(HEADERS) + 1):
+        cel = ws.cell(row=linha_inicio, column=col)
+        cel.border = BORDA
+        if col <= 4:
+            cel.fill = PatternFill("solid", fgColor="FFF3E0")
+        else:
+            cel.fill = ESTILOS["branco_fill"]
+
+    ws.cell(row=linha_inicio, column=1, value="Registros STONECODE 111222201:")
+    ws.cell(row=linha_inicio, column=1).font = Font(bold=True, size=10, color="E65100")
+    ws.cell(row=linha_inicio, column=1).alignment = Alignment(horizontal="left", vertical="center")
+    ws.merge_cells(f"A{linha_inicio}:C{linha_inicio}")
+
+    ws.cell(row=linha_inicio, column=4, value=qtd_especiais)
+    ws.cell(row=linha_inicio, column=4).font = Font(bold=True, size=10, color="000000")
+    ws.cell(row=linha_inicio, column=4).alignment = ESTILOS["centro"]
+
+    # Linha: Valor total STONECODE 111222201
+    linha_inicio += 1
+    for col in range(1, len(HEADERS) + 1):
+        cel = ws.cell(row=linha_inicio, column=col)
+        cel.border = BORDA
+        if col <= 4:
+            cel.fill = PatternFill("solid", fgColor="FFF3E0")
+        else:
+            cel.fill = ESTILOS["branco_fill"]
+
+    ws.cell(row=linha_inicio, column=1, value="Valor Total STONECODE 111222201:")
+    ws.cell(row=linha_inicio, column=1).font = Font(bold=True, size=10, color="E65100")
+    ws.cell(row=linha_inicio, column=1).alignment = Alignment(horizontal="left", vertical="center")
+    ws.merge_cells(f"A{linha_inicio}:C{linha_inicio}")
+
+    ws.cell(row=linha_inicio, column=4, value=total_especiais)
+    ws.cell(row=linha_inicio, column=4).font = Font(bold=True, size=10, color="000000")
+    ws.cell(row=linha_inicio, column=4).alignment = ESTILOS["centro"]
+    ws.cell(row=linha_inicio, column=4).number_format = "R$ #,##0.00"
+
+
+def aplicar_larguras(ws):
+    for col, largura in enumerate(LARGURAS, 1):
+        ws.column_dimensions[get_column_letter(col)].width = largura
+
+
+def extrair_valores(item):
+    return [
+        item.get("data_sicoob") or "",
+        item.get("data_stone") or "",
+        "SIM" if item.get("conciliado") else "NÃO",
+        item.get("valor_sicoob") or 0,
+        item.get("valor_stone") or 0,
+        item.get("descricao_sicoob") or "",
+        item.get("info_complementar") or "",
+        item.get("bandeira") or "",
+    ]
+
+
+def parse_data(valor):
+    if not valor:
+        return None
+    for fmt in ["%Y-%m-%d", "%d/%m/%Y"]:
+        try:
+            return datetime.strptime(valor, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def agrupar_por_mes(itens):
+    grupos = defaultdict(list)
+    for item in itens:
+        data = parse_data(item.get("data_sicoob", ""))
+        if data:
+            chave = f"{data.month:02d}-{data.year}"
+            grupos[chave].append(item)
+    return grupos
+
+
+def ordenar_por_data(itens):
+    return sorted(
+        itens,
+        key=lambda x: parse_data(x.get("data_sicoob", "")) or datetime.min,
+        reverse=True,
+    )
+
+
+def ordenar_chaves_mes(chaves):
+    def parse_chave(chave):
+        mes, ano = chave.split("-")
+        return (int(ano), int(mes))
+
+    return sorted(chaves, key=parse_chave)
+
+
+def criar_folha(wb, nome, itens):
+    ws = wb.create_sheet(title=nome)
+    aplicar_header(ws)
+
+    itens_ordenados = ordenar_por_data(itens)
     total_sicoob = 0
     total_stone = 0
+    total_especiais = 0
+    qtd_especiais = 0
 
-    for row_idx, registro in enumerate(registros, 2):
-        conciliado = registro.get("conciliado", "")
-        linha_par = row_idx % 2 == 0
+    for i, item in enumerate(itens_ordenados, 2):
+        valores = extrair_valores(item)
+        for col, valor in enumerate(valores, 1):
+            ws.cell(row=i, column=col, value=valor)
+        aplicar_linha(ws, i, item.get("conciliado", False), zebra=(i % 2 == 0))
 
-        for col_idx, campo in enumerate(campos, 1):
-            valor = registro.get(campo)
-            cel = ws.cell(row=row_idx, column=col_idx, value=valor)
-            cel.font = data_font
-            cel.alignment = alinhamento
-            cel.border = BORDA
+        total_sicoob += item.get("valor_sicoob") or 0
+        total_stone += item.get("valor_stone") or 0
+        total_especiais += item.get("valor_especiais") or 0
+        qtd_especiais += item.get("qtd_especiais") or 0
 
-            if campo == "conciliado":
-                cel.fill = fill_match if conciliado == "SIM" else fill_nao
-            else:
-                cel.fill = fill_zebra if linha_par else fill_branco
+    if itens_ordenados:
+        linha_total = len(itens_ordenados) + 2
+        aplicar_totais(ws, linha_total, total_sicoob, total_stone)
 
-            if campo in ["valor_sicoob", "valor_stone"]:
-                cel.number_format = "R$ #,##0.00"
+        # Adiciona área de informações
+        aplicar_area_informacoes(ws, linha_total, len(itens_ordenados), total_especiais, qtd_especiais)
 
-        total_sicoob += registro.get("valor_sicoob", 0) or 0
-        total_stone += registro.get("valor_stone", 0) or 0
-
-    if registros:
-        row_total = len(registros) + 2
-        total_font = Font(bold=True, size=11, color=COR_TOTAL_FONT)
-        total_fill = PatternFill("solid", fgColor=COR_TOTAL_BG)
-
-        for col in range(1, len(cabecalhos) + 1):
-            cel = ws.cell(row=row_total, column=col)
-            cel.font = total_font
-            cel.fill = total_fill
-            cel.border = BORDA
-            cel.alignment = alinhamento
-
-        ws.cell(row=row_total, column=1, value="TOTAL")
-        ws.cell(row=row_total, column=4, value=total_sicoob).number_format = (
-            "R$ #,##0.00"
-        )
-        ws.cell(row=row_total, column=5, value=total_stone).number_format = (
-            "R$ #,##0.00"
-        )
-
-    ajustar_largura_colunas(ws)
-
+    aplicar_larguras(ws)
     ws.freeze_panes = "A2"
 
-    if registros:
-        ultima_col = get_column_letter(len(cabecalhos))
-        ultima_linha = len(registros) + 1
-        ws.auto_filter.ref = f"A1:{ultima_col}{ultima_linha}"
+    if itens_ordenados:
+        ultima_linha = len(itens_ordenados) + 1
+        ultima_coluna = get_column_letter(len(HEADERS))
+        ws.auto_filter.ref = f"A1:{ultima_coluna}{ultima_linha}"
+
+
+def criar_planilha(itens, caminho):
+    wb = Workbook()
+
+    grupos = agrupar_por_mes(itens)
+    chaves_ordenadas = ordenar_chaves_mes(list(grupos.keys()))
+
+    for chave in chaves_ordenadas:
+        criar_folha(wb, chave, grupos[chave])
+
+    if "Sheet" in wb.sheetnames:
+        del wb["Sheet"]
+
+    wb.save(caminho)
+    return caminho

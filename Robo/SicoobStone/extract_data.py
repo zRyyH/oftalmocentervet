@@ -14,8 +14,4 @@ def extrair_dados(caminho_arquivo):
             return str(v)
         return v
 
-    resultado = [
-        {k: limpar_valor(v) for k, v in zip(cabecalho, linha)} for linha in dados
-    ]
-
-    return resultado
+    return [{k: limpar_valor(v) for k, v in zip(cabecalho, linha)} for linha in dados]

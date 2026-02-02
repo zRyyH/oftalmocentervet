@@ -1,17 +1,5 @@
 from datetime import datetime
-import re
-
-
-def parse_data(valor: str) -> datetime | None:
-    if not valor:
-        return None
-    valor = str(valor).replace("Z", "").strip()
-    for fmt in ["%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
-        try:
-            return datetime.strptime(valor, fmt)
-        except ValueError:
-            continue
-    return None
+from utils import parse_data, formatar_data as formatar_data_util
 
 
 def valores_iguais(valor1: float, valor2: float, tolerancia: float = 0.01) -> bool:
@@ -22,71 +10,9 @@ def datas_correspondem(data1: datetime, data2: datetime) -> bool:
     return data1.day == data2.day and data1.month == data2.month
 
 
-def extrair_tipo_pagamento_sicoob(descricao: str) -> str:
-    descricao = (descricao or "").upper()
-
-    padroes = {
-        "PIX": [r"\bPIX\b", r"PIX\s*-", r"PIX\s*TRANSF", r"PIX\s*ENV"],
-        "TED": [r"\bTED\b", r"TRANSF\s*TED"],
-        "DOC": [r"\bDOC\b"],
-        "BOLETO": [r"\bBOLETO\b", r"PAGTO\s*TITULO", r"PAG\s*TITULO"],
-        "DEBITO": [r"\bDEBITO\b", r"DEB\s*AUTO", r"DEBITO\s*AUTO"],
-        "CARTAO": [r"\bCARTAO\b", r"CART[AÃ]O"],
-        "CHEQUE": [r"\bCHEQUE\b", r"\bCHQ\b"],
-        "TRANSFERENCIA": [r"\bTRANSF\b", r"TRANSFER[EÊ]NCIA"],
-    }
-
-    for tipo, lista_padroes in padroes.items():
-        for padrao in lista_padroes:
-            if re.search(padrao, descricao):
-                return tipo
-
-    return "OUTRO"
-
-
-def normalizar_forma_pagamento(forma: str) -> str:
-    forma = (forma or "").upper().strip()
-    forma = forma.replace("É", "E").replace("Ã", "A").replace("Ç", "C")
-
-    mapeamento = {
-        "PIX": ["PIX"],
-        "TED": ["TED", "TRANSFERENCIA TED"],
-        "DOC": ["DOC"],
-        "BOLETO": ["BOLETO", "TITULO", "COBRANCA"],
-        "DEBITO": ["DEBITO", "DEB AUTO", "AUTOMATICO"],
-        "CARTAO": ["CARTAO", "CREDITO"],
-        "CHEQUE": ["CHEQUE", "CHQ"],
-        "TRANSFERENCIA": ["TRANSFERENCIA", "TRANSF"],
-        "DINHEIRO": ["DINHEIRO", "ESPECIE"],
-    }
-
-    for tipo, variantes in mapeamento.items():
-        for variante in variantes:
-            if variante in forma:
-                return tipo
-
-    return "OUTRO"
-
-
-def formas_pagamento_correspondem(tipo_sicoob: str, forma_erp: str) -> bool:
-    tipo_sicoob = tipo_sicoob.upper()
-    forma_erp_norm = normalizar_forma_pagamento(forma_erp)
-
-    if tipo_sicoob == forma_erp_norm:
-        return True
-
-    equivalencias = {
-        "TRANSFERENCIA": ["TED", "DOC", "PIX"],
-        "TED": ["TRANSFERENCIA"],
-        "DOC": ["TRANSFERENCIA"],
-        "PIX": ["TRANSFERENCIA"],
-    }
-
-    if tipo_sicoob in equivalencias:
-        if forma_erp_norm in equivalencias[tipo_sicoob]:
-            return True
-
-    return False
+def criar_mapeamento_payments(payments: list) -> dict:
+    """Cria dicionário de mapeamento sicoob_payment -> simplesvet_payment."""
+    return {p.get("sicoob_payment"): p.get("simplesvet_payment") for p in payments}
 
 
 def encontrar_correspondente(debito: dict, releases: list) -> dict | None:
@@ -105,35 +31,103 @@ def encontrar_correspondente(debito: dict, releases: list) -> dict | None:
     return None
 
 
+def eh_estorno(registro: dict) -> bool:
+    """Verifica se o registro é um estorno."""
+    descricao = (registro.get("descricao") or "").upper()
+    desc_complementar = (registro.get("desc_inf_complementar") or "").upper()
+    return "ESTORNO" in descricao or "ESTORNO" in desc_complementar
+
+
 def filtrar_debitos(sicoob: list) -> list:
-    return [s for s in sicoob if s.get("tipo", "").upper() == "DEBITO"]
+    resultado = []
+    for s in sicoob:
+        # Inclui DEBITOS normais
+        if s.get("tipo", "").upper() == "DEBITO":
+            resultado.append(s)
+            continue
+        # Inclui registros com ESTORNO na descrição, independente do tipo
+        if eh_estorno(s):
+            resultado.append(s)
+    return resultado
 
 
 def filtrar_despesas(releases: list) -> list:
-    return [r for r in releases if r.get("tipo") == "despesa"]
+    return [
+        r
+        for r in releases
+        if r.get("tipo") == "despesa" and r.get("forma_pagamento") != "CRE"
+    ]
 
 
-def formatar_data(data_str: str) -> str:
-    return data_str[:10] if data_str else ""
+def vincular_estornos(debitos: list) -> dict:
+    """
+    Vincula estornos com seus pagamentos correspondentes pelo valor.
+    Se houver múltiplos pagamentos com o mesmo valor, todos são vinculados ao estorno.
+    Retorna um dicionário com informações sobre vinculações.
+    """
+    estornos = []
+    pagamentos = []
+
+    # Separar estornos de pagamentos normais
+    for d in debitos:
+        if eh_estorno(d):
+            estornos.append(d)
+        else:
+            pagamentos.append(d)
+
+    vinculacoes = {}  # {id_estorno: [id_pagamento1, id_pagamento2, ...]}
+    estornos_vinculados = set()
+    pagamentos_vinculados = set()
+
+    # Para cada estorno, encontrar TODOS os pagamentos correspondentes
+    for estorno in estornos:
+        valor_estorno = abs(estorno.get("valor", 0))
+        id_estorno = id(estorno)
+        pagamentos_encontrados = []
+
+        # Procurar todos os pagamentos com mesmo valor que ainda não foram vinculados
+        for pagamento in pagamentos:
+            id_pagamento = id(pagamento)
+            if id_pagamento in pagamentos_vinculados:
+                continue
+
+            valor_pagamento = abs(pagamento.get("valor", 0))
+            if valores_iguais(valor_estorno, valor_pagamento):
+                pagamentos_encontrados.append(id_pagamento)
+                pagamentos_vinculados.add(id_pagamento)
+
+        # Se encontrou pelo menos um pagamento, vincular o estorno
+        if pagamentos_encontrados:
+            vinculacoes[id_estorno] = pagamentos_encontrados
+            estornos_vinculados.add(id_estorno)
+
+    return {
+        "vinculacoes": vinculacoes,
+        "estornos_vinculados": estornos_vinculados,
+        "pagamentos_vinculados": pagamentos_vinculados,
+    }
 
 
-def criar_item_conciliado(debito: dict, match: dict | None) -> dict:
+def criar_item_conciliado(debito: dict, match: dict | None, mapeamento: dict) -> dict:
     descricao_sicoob = debito.get("descricao", "")
-    tipo_pag_sicoob = extrair_tipo_pagamento_sicoob(descricao_sicoob)
+    tipo_pag_sicoob = mapeamento.get(descricao_sicoob, "OUTRO")
     forma_pag_erp = match.get("forma_pagamento") if match else None
 
     forma_confere = None
     if match and forma_pag_erp:
-        forma_confere = formas_pagamento_correspondem(tipo_pag_sicoob, forma_pag_erp)
+        forma_confere = tipo_pag_sicoob == forma_pag_erp
+
+    # Se encontrou match mas a forma de pagamento não confere, considera não conciliado
+    conciliado = match is not None and (forma_confere is None or forma_confere is True)
 
     return {
-        "data_sicoob": formatar_data(debito.get("data", "")),
+        "data_sicoob": formatar_data_util(debito.get("data", "")),
         "valor_sicoob": debito.get("valor", 0),
         "descricao_sicoob": descricao_sicoob,
         "info_complementar": debito.get("desc_inf_complementar", ""),
         "tipo_pag_sicoob": tipo_pag_sicoob,
-        "conciliado": match is not None,
-        "data_erp": formatar_data(match.get("data", "")) if match else None,
+        "conciliado": conciliado,
+        "data_erp": formatar_data_util(match.get("data", "")) if match else None,
         "valor_erp": abs(match.get("valor", 0)) if match else None,
         "descricao_erp": match.get("descricao") if match else None,
         "fornecedor_erp": match.get("fornecedor") if match else None,
@@ -145,18 +139,42 @@ def criar_item_conciliado(debito: dict, match: dict | None) -> dict:
 def conciliar(dados: dict) -> dict:
     debitos = filtrar_debitos(dados.get("sicoob", []))
     despesas = filtrar_despesas(dados.get("releases", []))
+    mapeamento = criar_mapeamento_payments(dados.get("payments", []))
+
+    # Vincular estornos com pagamentos
+    info_estornos = vincular_estornos(debitos)
 
     usados = set()
     itens = []
 
     for debito in debitos:
+        id_debito = id(debito)
+        is_estorno = eh_estorno(debito)
+        estorno_vinculado = id_debito in info_estornos["estornos_vinculados"]
+        pagamento_vinculado = id_debito in info_estornos["pagamentos_vinculados"]
+
+        # Se é estorno vinculado ou pagamento vinculado, não conciliar com ERP
+        if estorno_vinculado or pagamento_vinculado:
+            item = criar_item_conciliado(debito, None, mapeamento)
+            item["estorno_vinculado"] = True
+            itens.append(item)
+            continue
+
+        # Se é estorno sem vinculação, marcar como estorno sem par
+        if is_estorno:
+            item = criar_item_conciliado(debito, None, mapeamento)
+            item["estorno_sem_par"] = True
+            itens.append(item)
+            continue
+
+        # Pagamento normal - tentar conciliar com ERP
         disponiveis = [r for r in despesas if r.get("id") not in usados]
         match = encontrar_correspondente(debito, disponiveis)
 
         if match:
             usados.add(match.get("id"))
 
-        itens.append(criar_item_conciliado(debito, match))
+        itens.append(criar_item_conciliado(debito, match, mapeamento))
 
     conciliados = [i for i in itens if i["conciliado"]]
     formas_ok = sum(1 for i in conciliados if i["forma_confere"] is True)
