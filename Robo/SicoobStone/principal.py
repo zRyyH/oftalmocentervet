@@ -1,8 +1,69 @@
 from .normalizers import normalizar_dados
 from .extract_data import extrair_dados
-from .planilha import criar_planilha
 from .conciliador import conciliar
 from .vinculador import vincular
+from planilha import criar_planilha
+
+HEADERS = [
+    "Data Sicoob",
+    "Data Stone",
+    "Conciliado",
+    "Valor Sicoob (R$)",
+    "Valor Stone (R$)",
+    "Descrição Sicoob",
+    "Info Complementar",
+    "Bandeira",
+]
+
+CAMPOS = [
+    "data_sicoob",
+    "data_stone",
+    "conciliado",
+    "valor_sicoob",
+    "valor_stone",
+    "descricao_sicoob",
+    "info_complementar",
+    "bandeira",
+]
+
+CONFIG = {
+    "coluna_data": "data_sicoob",
+    "colunas_status": [3],
+    "colunas_moeda": [4, 5],
+    "colunas_soma": [4, 5],
+    "larguras": [12, 12, 12, 16, 18, 35, 50, 18],
+    "resumo": {
+        "titulo": "RESUMO GERAL",
+        "linhas": [
+            {
+                "label": "Total de Registros:",
+                "tipo": "total_registros",
+                "cor": "azul",
+            },
+            {
+                "label": "Registros STONECODE 111222201:",
+                "tipo": "soma",
+                "campo": "qtd_especiais",
+                "cor": "laranja",
+            },
+            {
+                "label": "Valor Total STONECODE 111222201:",
+                "tipo": "soma",
+                "campo": "valor_especiais",
+                "cor": "laranja",
+            },
+        ],
+    },
+}
+
+
+def _preparar_dados(resultado):
+    dados_formatados = []
+    for item in resultado:
+        registro = item.copy()
+        registro["conciliado"] = "SIM" if item.get("conciliado") else "NÃO"
+        dados_formatados.append(registro)
+    return dados_formatados
 
 
 def executar_sicoob_stone(dados, caminho_stone="Stone/extrato.xlsx"):
@@ -13,6 +74,7 @@ def executar_sicoob_stone(dados, caminho_stone="Stone/extrato.xlsx"):
     vinculados = vincular(norm["sicoob"], norm["stone"], norm["brands"])
     resultado = conciliar(vinculados)
 
-    criar_planilha(resultado, "Relatorios/Sicoob Stone.xlsx")
+    dados_formatados = _preparar_dados(resultado)
+    criar_planilha(dados_formatados, "Relatorios/Sicoob Stone.xlsx", HEADERS, CAMPOS, CONFIG)
 
     return resultado

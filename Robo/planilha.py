@@ -20,6 +20,10 @@ CORES = {
     "vazio": PatternFill("solid", fgColor="FFCCCC"),
     "total": PatternFill("solid", fgColor="37474F"),
     "destaque": PatternFill("solid", fgColor="ADD8E6"),
+    "estorno": PatternFill("solid", fgColor="FFE0B2"),  # Laranja suave
+    "resumo_header": PatternFill("solid", fgColor="1565C0"),
+    "resumo_azul": PatternFill("solid", fgColor="E3F2FD"),
+    "resumo_laranja": PatternFill("solid", fgColor="FFF3E0"),
 }
 
 FONTES = {
@@ -28,6 +32,9 @@ FONTES = {
     "erro": Font(size=10, color="CC0000"),
     "aviso": Font(size=10, color="0000CC"),
     "total": Font(bold=True, size=11, color="FFFFFF"),
+    "resumo_azul": Font(bold=True, size=10, color="1565C0"),
+    "resumo_laranja": Font(bold=True, size=10, color="E65100"),
+    "resumo_valor": Font(bold=True, size=10, color="000000"),
 }
 
 
@@ -65,6 +72,7 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
     colunas_erro = config.get("colunas_erro", {})
     colunas_destaque = config.get("colunas_destaque", [])
     marcar_vazios = config.get("marcar_vazios", False)
+    cor_linha = config.get("cor_linha")  # Cor para toda a linha
 
     for col, valor in enumerate(valores, 1):
         cel = ws.cell(row=linha, column=col, value=valor)
@@ -72,8 +80,10 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
         cel.alignment = Alignment(horizontal="center", vertical="center")
         cel.font = FONTES["celula"]
 
-        # Cor de fundo base
-        if col in colunas_destaque:
+        # Cor de fundo base - prioridade: cor_linha > destaque > status > zebra
+        if cor_linha and cor_linha in CORES:
+            cel.fill = CORES[cor_linha]
+        elif col in colunas_destaque:
             cel.fill = CORES["destaque"]
         elif col in colunas_status:
             if valor == "SIM":
@@ -118,6 +128,101 @@ def _aplicar_totais(ws, linha, totais, config):
             cel.number_format = "R$ #,##0.00"
 
 
+def _aplicar_resumo(ws, linha_inicio, dados, config):
+    """
+    Aplica área de resumo no final da folha.
+
+    config["resumo"] deve conter:
+        - titulo: título do resumo (ex: "RESUMO GERAL")
+        - linhas: lista de dicts com:
+            - label: texto do label
+            - tipo: "contagem", "soma" ou "total_registros"
+            - campo: campo para somar (se tipo="soma")
+            - filtro: dict {campo: valor} para filtrar registros
+            - cor: "azul" ou "laranja" (default: "azul")
+    """
+    resumo_config = config.get("resumo")
+    if not resumo_config:
+        return linha_inicio
+
+    titulo = resumo_config.get("titulo", "RESUMO GERAL")
+    linhas = resumo_config.get("linhas", [])
+    num_colunas = ws.max_column
+
+    # Linha em branco para separação
+    linha_inicio += 2
+
+    # Cabeçalho do resumo
+    for col in range(1, num_colunas + 1):
+        cel = ws.cell(row=linha_inicio, column=col)
+        cel.font = FONTES["header"]
+        cel.fill = CORES["resumo_header"]
+        cel.alignment = Alignment(horizontal="center", vertical="center")
+        cel.border = BORDA
+
+    ws.cell(row=linha_inicio, column=1, value=titulo)
+    ws.merge_cells(f"A{linha_inicio}:{get_column_letter(num_colunas)}{linha_inicio}")
+
+    # Linhas do resumo
+    for item_resumo in linhas:
+        linha_inicio += 1
+        label = item_resumo.get("label", "")
+        tipo = item_resumo.get("tipo", "contagem")
+        campo = item_resumo.get("campo")
+        filtro = item_resumo.get("filtro", {})
+        cor = item_resumo.get("cor", "azul")
+
+        # Aplica estilo nas células
+        cor_fill = CORES.get(f"resumo_{cor}", CORES["resumo_azul"])
+        cor_font = FONTES.get(f"resumo_{cor}", FONTES["resumo_azul"])
+
+        for col in range(1, num_colunas + 1):
+            cel = ws.cell(row=linha_inicio, column=col)
+            cel.border = BORDA
+            if col <= 4:
+                cel.fill = cor_fill
+            else:
+                cel.fill = CORES["branco"]
+
+        # Label
+        ws.cell(row=linha_inicio, column=1, value=label)
+        ws.cell(row=linha_inicio, column=1).font = cor_font
+        ws.cell(row=linha_inicio, column=1).alignment = Alignment(
+            horizontal="left", vertical="center"
+        )
+        ws.merge_cells(f"A{linha_inicio}:C{linha_inicio}")
+
+        # Calcula valor baseado no tipo e filtro
+        dados_filtrados = dados
+        if filtro:
+            dados_filtrados = [
+                d for d in dados
+                if all(d.get(k) == v for k, v in filtro.items())
+            ]
+
+        if tipo == "total_registros":
+            valor = len(dados)
+        elif tipo == "contagem":
+            valor = len(dados_filtrados)
+        elif tipo == "soma" and campo:
+            valor = sum(
+                d.get(campo, 0) or 0
+                for d in dados_filtrados
+                if isinstance(d.get(campo), (int, float))
+            )
+        else:
+            valor = 0
+
+        cel_valor = ws.cell(row=linha_inicio, column=4, value=valor)
+        cel_valor.font = FONTES["resumo_valor"]
+        cel_valor.alignment = Alignment(horizontal="center", vertical="center")
+
+        if tipo == "soma":
+            cel_valor.number_format = "R$ #,##0.00"
+
+    return linha_inicio
+
+
 def _ajustar_larguras(ws, larguras=None):
     for col_idx, col in enumerate(ws.columns, 1):
         if larguras and col_idx <= len(larguras):
@@ -156,6 +261,10 @@ def _criar_folha(wb, nome, dados, headers, campos, config):
                 campos.index(k) + 1 for k in item["_destaque"] if k in campos
             ]
 
+        # Suporte a cor de linha inteira
+        if "_cor_linha" in item:
+            linha_config["cor_linha"] = item["_cor_linha"]
+
         _aplicar_linha(ws, i, valores, linha_config, zebra=(i % 2 == 0))
 
         # Acumula totais
@@ -165,8 +274,14 @@ def _criar_folha(wb, nome, dados, headers, campos, config):
                 totais[col] += val
 
     # Linha de totais
+    linha_atual = len(dados) + 1
     if colunas_soma and dados:
-        _aplicar_totais(ws, len(dados) + 2, totais, config)
+        linha_atual = len(dados) + 2
+        _aplicar_totais(ws, linha_atual, totais, config)
+
+    # Área de resumo
+    if config.get("resumo") and dados:
+        _aplicar_resumo(ws, linha_atual, dados, config)
 
     _ajustar_larguras(ws, config.get("larguras"))
     ws.freeze_panes = "A2"
@@ -187,10 +302,19 @@ def criar_planilha(dados, arquivo, headers=None, campos=None, config=None):
         - colunas_soma: lista de índices (1-based) para somar e exibir total
         - larguras: lista de larguras por coluna
         - marcar_vazios: True para pintar células vazias de rosa
+        - resumo: dict para área de resumo no final de cada folha:
+            - titulo: título do resumo (ex: "RESUMO GERAL")
+            - linhas: lista de dicts com:
+                - label: texto do label
+                - tipo: "contagem", "soma" ou "total_registros"
+                - campo: campo para somar (se tipo="soma")
+                - filtro: dict {campo: valor} para filtrar registros
+                - cor: "azul" ou "laranja" (default: "azul")
 
     Cada item pode ter:
         - _erros: dict {campo: "erro"|"aviso"} para fonte colorida
         - _destaque: lista de campos para fundo azul claro
+        - _cor_linha: nome da cor para aplicar em toda a linha (ex: "estorno")
     """
     if not dados:
         return None

@@ -59,10 +59,20 @@ def filtrar_despesas(releases: list) -> list:
     ]
 
 
+def datas_proximas(data1: datetime, data2: datetime, dias_tolerancia: int = 1) -> bool:
+    """Verifica se duas datas estão dentro de um período de tolerância em dias."""
+    if not data1 or not data2:
+        return False
+    diferenca = abs((data1 - data2).days)
+    return diferenca <= dias_tolerancia
+
+
 def vincular_estornos(debitos: list) -> dict:
     """
-    Vincula estornos com seus pagamentos correspondentes pelo valor.
-    Se houver múltiplos pagamentos com o mesmo valor, todos são vinculados ao estorno.
+    Vincula estornos com pagamentos refeitos pelo valor e proximidade de data.
+    Um estorno é vinculado a um pagamento se:
+    - Os valores são iguais
+    - A diferença de datas é de até 1 dia
     Retorna um dicionário com informações sobre vinculações.
     """
     estornos = []
@@ -75,31 +85,30 @@ def vincular_estornos(debitos: list) -> dict:
         else:
             pagamentos.append(d)
 
-    vinculacoes = {}  # {id_estorno: [id_pagamento1, id_pagamento2, ...]}
+    vinculacoes = {}  # {id_estorno: id_pagamento}
     estornos_vinculados = set()
     pagamentos_vinculados = set()
 
-    # Para cada estorno, encontrar TODOS os pagamentos correspondentes
+    # Para cada estorno, encontrar um pagamento correspondente (mesmo valor, data próxima)
     for estorno in estornos:
         valor_estorno = abs(estorno.get("valor", 0))
+        data_estorno = parse_data(estorno.get("data"))
         id_estorno = id(estorno)
-        pagamentos_encontrados = []
 
-        # Procurar todos os pagamentos com mesmo valor que ainda não foram vinculados
+        # Procurar pagamento com mesmo valor e data próxima (até 1 dia de diferença)
         for pagamento in pagamentos:
             id_pagamento = id(pagamento)
             if id_pagamento in pagamentos_vinculados:
                 continue
 
             valor_pagamento = abs(pagamento.get("valor", 0))
-            if valores_iguais(valor_estorno, valor_pagamento):
-                pagamentos_encontrados.append(id_pagamento)
-                pagamentos_vinculados.add(id_pagamento)
+            data_pagamento = parse_data(pagamento.get("data"))
 
-        # Se encontrou pelo menos um pagamento, vincular o estorno
-        if pagamentos_encontrados:
-            vinculacoes[id_estorno] = pagamentos_encontrados
-            estornos_vinculados.add(id_estorno)
+            if valores_iguais(valor_estorno, valor_pagamento) and datas_proximas(data_estorno, data_pagamento):
+                vinculacoes[id_estorno] = id_pagamento
+                estornos_vinculados.add(id_estorno)
+                pagamentos_vinculados.add(id_pagamento)
+                break  # Um estorno só vincula com um pagamento
 
     return {
         "vinculacoes": vinculacoes,
