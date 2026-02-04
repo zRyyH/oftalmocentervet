@@ -34,23 +34,24 @@ CONFIG = {
     "larguras": [12, 12, 12, 16, 18, 35, 50, 18],
     "resumo": {
         "titulo": "RESUMO GERAL",
+        "cor_header": "verde",
         "linhas": [
             {
                 "label": "Total de Registros:",
                 "tipo": "total_registros",
-                "cor": "azul",
+                "cor": "verde",
             },
             {
-                "label": "Registros STONECODE 111222201:",
-                "tipo": "soma",
+                "label": "Registros Stone Link De Pagamento:",
+                "tipo": "quantidade",
                 "campo": "qtd_especiais",
-                "cor": "laranja",
+                "cor": "verde",
             },
             {
-                "label": "Valor Total STONECODE 111222201:",
+                "label": "Valor Total Stone Link De Pagamento:",
                 "tipo": "soma",
                 "campo": "valor_especiais",
-                "cor": "laranja",
+                "cor": "verde",
             },
         ],
     },

@@ -25,6 +25,8 @@ CORES = {
     "resumo_header": PatternFill("solid", fgColor="1565C0"),
     "resumo_azul": PatternFill("solid", fgColor="E3F2FD"),
     "resumo_laranja": PatternFill("solid", fgColor="FFF3E0"),
+    "resumo_verde_header": PatternFill("solid", fgColor="2E7D32"),
+    "resumo_verde": PatternFill("solid", fgColor="E8F5E9"),
 }
 
 FONTES = {
@@ -35,6 +37,7 @@ FONTES = {
     "total": Font(bold=True, size=11, color="FFFFFF"),
     "resumo_azul": Font(bold=True, size=10, color="1565C0"),
     "resumo_laranja": Font(bold=True, size=10, color="E65100"),
+    "resumo_verde": Font(bold=True, size=10, color="2E7D32"),
     "resumo_valor": Font(bold=True, size=10, color="000000"),
 }
 
@@ -135,12 +138,13 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
 
     config["resumo"] deve conter:
         - titulo: título do resumo (ex: "RESUMO GERAL")
+        - cor_header: cor do cabeçalho ("azul", "verde", etc.)
         - linhas: lista de dicts com:
             - label: texto do label
-            - tipo: "contagem", "soma" ou "total_registros"
-            - campo: campo para somar (se tipo="soma")
+            - tipo: "contagem", "soma", "quantidade" ou "total_registros"
+            - campo: campo para somar (se tipo="soma" ou "quantidade")
             - filtro: dict {campo: valor} para filtrar registros
-            - cor: "azul" ou "laranja" (default: "azul")
+            - cor: "azul", "laranja" ou "verde" (default: "azul")
     """
     resumo_config = config.get("resumo")
     if not resumo_config:
@@ -148,16 +152,18 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
 
     titulo = resumo_config.get("titulo", "RESUMO GERAL")
     linhas = resumo_config.get("linhas", [])
+    cor_header = resumo_config.get("cor_header", "azul")
     num_colunas = ws.max_column
 
     # Linha em branco para separação
     linha_inicio += 2
 
     # Cabeçalho do resumo
+    header_fill = CORES.get(f"resumo_{cor_header}_header", CORES["resumo_header"])
     for col in range(1, num_colunas + 1):
         cel = ws.cell(row=linha_inicio, column=col)
         cel.font = FONTES["header"]
-        cel.fill = CORES["resumo_header"]
+        cel.fill = header_fill
         cel.alignment = Alignment(horizontal="center", vertical="center")
         cel.border = BORDA
 
@@ -205,7 +211,7 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
             valor = len(dados)
         elif tipo == "contagem":
             valor = len(dados_filtrados)
-        elif tipo == "soma" and campo:
+        elif tipo in ("soma", "quantidade") and campo:
             valor = sum(
                 d.get(campo, 0) or 0
                 for d in dados_filtrados
@@ -305,12 +311,13 @@ def criar_planilha(dados, arquivo, headers=None, campos=None, config=None):
         - marcar_vazios: True para pintar células vazias de rosa
         - resumo: dict para área de resumo no final de cada folha:
             - titulo: título do resumo (ex: "RESUMO GERAL")
+            - cor_header: cor do cabeçalho ("azul", "verde", etc.)
             - linhas: lista de dicts com:
                 - label: texto do label
-                - tipo: "contagem", "soma" ou "total_registros"
-                - campo: campo para somar (se tipo="soma")
+                - tipo: "contagem", "soma", "quantidade" ou "total_registros"
+                - campo: campo para somar (se tipo="soma" ou "quantidade")
                 - filtro: dict {campo: valor} para filtrar registros
-                - cor: "azul" ou "laranja" (default: "azul")
+                - cor: "azul", "laranja" ou "verde" (default: "azul")
 
     Cada item pode ter:
         - _erros: dict {campo: "erro"|"aviso"} para fonte colorida
