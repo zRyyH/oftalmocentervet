@@ -21,6 +21,7 @@ def extrair_linha(item):
         "bandeira": finpet.get("payment_brand"),
         "beneficiario": finpet.get("beneficiary"),
         "score": item.get("score"),
+        "motivo_zerado": item.get("motivo_zerado") or "",
         "parcela_finpet": comp.get("parcela", {}).get("finpet"),
         "parcela_release": comp.get("parcela", {}).get("release"),
         "valor_finpet_2": comp.get("valor", {}).get("finpet"),

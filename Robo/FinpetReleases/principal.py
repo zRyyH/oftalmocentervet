@@ -26,6 +26,7 @@ HEADERS = [
     "Pedidos Extraidos",
     "Cliente Lancamento",
     "Beneficiário",
+    "Motivo Zerado",
 ]
 
 CAMPOS = [
@@ -44,6 +45,7 @@ CAMPOS = [
     "pedidos",
     "cliente_release",
     "beneficiario",
+    "motivo_zerado",
 ]
 
 
@@ -94,6 +96,7 @@ def gerar_relatorio(dados, caminho="Relatorios/Finpet Lancamentos.xlsx"):
         "coluna_data": "data_estimada",
         "colunas_moeda": [1, 7, 8],  # Valor Finpet, Valor Finpet 2, Valor Simplesvet
         "marcar_vazios": True,
+        "ignorar_vazios": [16],  # Motivo Zerado não precisa ser marcado
     }
 
     criar_planilha(

@@ -76,6 +76,7 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
     colunas_erro = config.get("colunas_erro", {})
     colunas_destaque = config.get("colunas_destaque", [])
     marcar_vazios = config.get("marcar_vazios", False)
+    ignorar_vazios = config.get("ignorar_vazios", [])
     cor_linha = config.get("cor_linha")  # Cor para toda a linha
 
     for col, valor in enumerate(valores, 1):
@@ -96,7 +97,7 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
                 cel.fill = CORES["nao"]
             else:
                 cel.fill = CORES["zebra"] if zebra else CORES["branco"]
-        elif marcar_vazios and (valor is None or valor == ""):
+        elif marcar_vazios and (valor is None or valor == "") and col not in ignorar_vazios:
             cel.fill = CORES["vazio"]
         else:
             cel.fill = CORES["zebra"] if zebra else CORES["branco"]
