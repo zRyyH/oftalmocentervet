@@ -19,6 +19,7 @@ def extrair_linha(item):
         "valor_finpet": comp.get("valor", {}).get("finpet"),
         "data_estimada": formatar_data(comp.get("data", {}).get("finpet_estimated")),
         "bandeira": finpet.get("payment_brand"),
+        "beneficiario": finpet.get("beneficiary"),
         "score": item.get("score"),
         "parcela_finpet": comp.get("parcela", {}).get("finpet"),
         "parcela_release": comp.get("parcela", {}).get("release"),

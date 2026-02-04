@@ -30,8 +30,8 @@ def calcular_match(finpet: dict, release: dict) -> dict:
     comp["data"] = _comparar_data(finpet, release)
     comp["auth"] = _comparar_auth(finpet, descricao, is_supplier)
 
-    # Falha catastrófica: diferença de valor > 3 descarta o match
-    if not comp["valor"]["match"]:
+    # Falha catastrófica: diferença de valor > 3 reais descarta o match
+    if comp["valor"]["diferenca_alta"]:
         return None
 
     for campo in ["parcela", "valor", "data", "auth"]:
@@ -105,13 +105,15 @@ def _comparar_parcela(finpet: dict, release: dict, is_supplier: bool) -> dict:
 def _comparar_valor(finpet: dict, release: dict) -> dict:
     v1 = normalizar_valor(finpet.get("value"))
     v2 = normalizar_valor(release.get("valor"))
+    diferenca = abs(v1 - v2)
 
     return {
         "finpet": finpet.get("value"),
         "release": release.get("valor"),
-        "exact_value": abs(v1 - v2) == 0,
-        "approximate_value": abs(v1 - v2) <= 0.03,
-        "match": abs(v1 - v2) <= 3.00,
+        "exact_value": diferenca == 0,
+        "approximate_value": diferenca <= 0.03,
+        "match": diferenca == 0,  # Match só se valor exato
+        "diferenca_alta": diferenca > 3,  # Flag para zerar pontuação
     }
 
 def _comparar_data(finpet: dict, release: dict) -> dict:

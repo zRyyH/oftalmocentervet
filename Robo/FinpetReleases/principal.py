@@ -25,6 +25,7 @@ HEADERS = [
     "Auth Simplesvet",
     "Pedidos Extraidos",
     "Cliente Lancamento",
+    "Beneficiário",
 ]
 
 CAMPOS = [
@@ -42,6 +43,7 @@ CAMPOS = [
     "auth_release",
     "pedidos",
     "cliente_release",
+    "beneficiario",
 ]
 
 

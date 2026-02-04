@@ -1,5 +1,5 @@
 from FinpetConciliations import executar_finpet_conciliacoes
-from FinpetSimplesvet import executar_finpet_lancamentos
+from FinpetReleases import executar_finpet_lancamentos
 from SicoobReleases import executar_sicoob_releases
 from SicoobFinpet import executar_sicoob_finpet
 from SicoobFatura import executar_sicoob_fatura
