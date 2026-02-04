@@ -21,6 +21,7 @@ CORES = {
     "total": PatternFill("solid", fgColor="37474F"),
     "destaque": PatternFill("solid", fgColor="ADD8E6"),
     "estorno": PatternFill("solid", fgColor="FFE0B2"),  # Laranja suave
+    "devolucao": PatternFill("solid", fgColor="E1BEE7"),  # Roxo suave
     "resumo_header": PatternFill("solid", fgColor="1565C0"),
     "resumo_azul": PatternFill("solid", fgColor="E3F2FD"),
     "resumo_laranja": PatternFill("solid", fgColor="FFF3E0"),

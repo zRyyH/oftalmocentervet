@@ -48,6 +48,12 @@ def preparar_item(item):
     is_fatura = eh_fatura(item)
     estorno_vinculado = item.get("estorno_vinculado", False)
     estorno_sem_par = item.get("estorno_sem_par", False)
+    is_devolucao = item.get("devolucao", False)
+    pagamento_com_devolucao = item.get("pagamento_com_devolucao", False)
+    devolucao_sem_vinculo = item.get("devolucao_sem_vinculo", False)
+    pagamento_vinculado_desc = item.get("pagamento_vinculado_desc")
+    valor_original = item.get("valor_original")
+    valor_devolucao = item.get("valor_devolucao")
     forma_confere = item.get("forma_confere")
 
     # Determinar o status de conciliação
@@ -55,6 +61,11 @@ def preparar_item(item):
         status_conciliado = "FATURA"
     elif estorno_vinculado:
         status_conciliado = "ESTORNO"
+    elif is_devolucao:
+        status_conciliado = "DEVOLUÇÃO"
+    elif pagamento_com_devolucao:
+        # Pagamento com devolução mostra status normal de conciliação
+        status_conciliado = "SIM" if item.get("conciliado") else "NÃO"
     else:
         status_conciliado = "SIM" if item.get("conciliado") else "NÃO"
 
@@ -78,6 +89,12 @@ def preparar_item(item):
             info_complementar = f"[ESTORNO VINCULADO] {info_complementar}".strip()
         elif estorno_sem_par:
             info_complementar = f"[ESTORNO SEM PAR] {info_complementar}".strip()
+        elif is_devolucao and devolucao_sem_vinculo:
+            info_complementar = f"[DEVOLUÇÃO SEM VÍNCULO] {info_complementar}".strip()
+        elif is_devolucao:
+            info_complementar = f"[DEVOLUÇÃO] {info_complementar}".strip()
+        elif pagamento_com_devolucao and valor_original and valor_devolucao:
+            info_complementar = f"[PAGAMENTO COM DEVOLUÇÃO: R${valor_original:.2f} - R${valor_devolucao:.2f} = R${item.get('valor_sicoob', 0):.2f}] {info_complementar}".strip()
 
         novo_item = {
             "data_sicoob": item.get("data_sicoob", ""),
@@ -107,6 +124,10 @@ def preparar_item(item):
     # Adicionar cor laranja para estornos vinculados
     if estorno_vinculado:
         novo_item["_cor_linha"] = "estorno"
+
+    # Adicionar cor roxo suave para devoluções e pagamentos com devolução
+    if is_devolucao or pagamento_com_devolucao:
+        novo_item["_cor_linha"] = "devolucao"
 
     return novo_item
 

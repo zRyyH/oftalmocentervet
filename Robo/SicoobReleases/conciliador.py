@@ -38,8 +38,109 @@ def eh_estorno(registro: dict) -> bool:
     return "ESTORNO" in descricao or "ESTORNO" in desc_complementar
 
 
-def filtrar_debitos(sicoob: list) -> list:
+def criar_mapeamento_devolucoes(returns: list) -> list[dict]:
+    """
+    Retorna lista de dicts com description_return e description_payment.
+    Usado para identificar devoluções e vinculá-las aos pagamentos.
+    """
+    return [
+        {"description_return": r.get("description_return"), "description_payment": r.get("description_payment")}
+        for r in returns
+        if r.get("description_return")
+    ]
+
+
+def eh_devolucao(registro: dict, mapeamento_devolucoes: list) -> tuple[bool, str | None]:
+    """
+    Verifica se o registro é uma devolução comparando desc_inf_complementar
+    com description_return do mapeamento.
+    Retorna (is_devolucao, description_payment_vinculado).
+    """
+    desc_complementar = registro.get("desc_inf_complementar") or ""
+    for item in mapeamento_devolucoes:
+        description_return = item.get("description_return")
+        if description_return and description_return in desc_complementar:
+            return True, item.get("description_payment")
+    return False, None
+
+
+def eh_pagamento_com_devolucao(registro: dict, mapeamento_devolucoes: list) -> tuple[bool, str | None]:
+    """
+    Verifica se o registro é um pagamento que tem devolução vinculada.
+    Compara desc_inf_complementar com description_payment do mapeamento.
+    Retorna (is_pagamento_com_devolucao, description_return_vinculado).
+    """
+    desc_complementar = registro.get("desc_inf_complementar") or ""
+    for item in mapeamento_devolucoes:
+        description_payment = item.get("description_payment")
+        if description_payment and description_payment in desc_complementar:
+            return True, item.get("description_return")
+    return False, None
+
+
+def vincular_devolucoes(debitos: list, mapeamento_devolucoes: list) -> dict:
+    """
+    Vincula devoluções com pagamentos originais.
+    Um vínculo é feito quando:
+    - A devolução contém description_return
+    - O pagamento contém description_payment correspondente
+    - A diferença de datas é de até 1 dia
+
+    Retorna dict com informações sobre vinculações e valores a subtrair.
+    """
+    devolucoes = []
+    pagamentos_potenciais = []
+
+    # Separar devoluções de pagamentos potenciais
+    for d in debitos:
+        is_devolucao, desc_payment = eh_devolucao(d, mapeamento_devolucoes)
+        if is_devolucao:
+            devolucoes.append((d, desc_payment))
+        else:
+            is_pagamento, desc_return = eh_pagamento_com_devolucao(d, mapeamento_devolucoes)
+            if is_pagamento:
+                pagamentos_potenciais.append((d, desc_return))
+
+    vinculacoes = {}  # {id_devolucao: id_pagamento}
+    devolucoes_vinculadas = set()
+    pagamentos_vinculados = set()
+    valores_subtrair = {}  # {id_pagamento: valor_a_subtrair}
+
+    # Para cada devolução, encontrar o pagamento correspondente
+    for devolucao, desc_payment in devolucoes:
+        data_devolucao = parse_data(devolucao.get("data"))
+        valor_devolucao = abs(devolucao.get("valor", 0))
+        id_devolucao = id(devolucao)
+
+        for pagamento, desc_return in pagamentos_potenciais:
+            id_pagamento = id(pagamento)
+            if id_pagamento in pagamentos_vinculados:
+                continue
+
+            # Verificar se o description_payment da devolução corresponde ao pagamento
+            desc_complementar_pag = pagamento.get("desc_inf_complementar") or ""
+            if desc_payment and desc_payment in desc_complementar_pag:
+                data_pagamento = parse_data(pagamento.get("data"))
+
+                # Verificar proximidade de data (máximo 1 dia)
+                if datas_proximas(data_devolucao, data_pagamento, dias_tolerancia=1):
+                    vinculacoes[id_devolucao] = id_pagamento
+                    devolucoes_vinculadas.add(id_devolucao)
+                    pagamentos_vinculados.add(id_pagamento)
+                    valores_subtrair[id_pagamento] = valor_devolucao
+                    break
+
+    return {
+        "vinculacoes": vinculacoes,
+        "devolucoes_vinculadas": devolucoes_vinculadas,
+        "pagamentos_vinculados": pagamentos_vinculados,
+        "valores_subtrair": valores_subtrair,
+    }
+
+
+def filtrar_debitos(sicoob: list, mapeamento_devolucoes: list = None) -> list:
     resultado = []
+    mapeamento_devolucoes = mapeamento_devolucoes or []
     for s in sicoob:
         # Inclui DEBITOS normais
         if s.get("tipo", "").upper() == "DEBITO":
@@ -47,6 +148,11 @@ def filtrar_debitos(sicoob: list) -> list:
             continue
         # Inclui registros com ESTORNO na descrição, independente do tipo
         if eh_estorno(s):
+            resultado.append(s)
+            continue
+        # Inclui devoluções (independente de crédito ou débito)
+        is_devolucao, _ = eh_devolucao(s, mapeamento_devolucoes)
+        if is_devolucao:
             resultado.append(s)
     return resultado
 
@@ -146,12 +252,16 @@ def criar_item_conciliado(debito: dict, match: dict | None, mapeamento: dict) ->
 
 
 def conciliar(dados: dict) -> dict:
-    debitos = filtrar_debitos(dados.get("sicoob", []))
+    mapeamento_devolucoes = criar_mapeamento_devolucoes(dados.get("returns", []))
+    debitos = filtrar_debitos(dados.get("sicoob", []), mapeamento_devolucoes)
     despesas = filtrar_despesas(dados.get("releases", []))
     mapeamento = criar_mapeamento_payments(dados.get("payments", []))
 
     # Vincular estornos com pagamentos
     info_estornos = vincular_estornos(debitos)
+
+    # Vincular devoluções com pagamentos originais
+    info_devolucoes = vincular_devolucoes(debitos, mapeamento_devolucoes)
 
     usados = set()
     itens = []
@@ -159,11 +269,54 @@ def conciliar(dados: dict) -> dict:
     for debito in debitos:
         id_debito = id(debito)
         is_estorno = eh_estorno(debito)
+        is_devolucao, pagamento_vinculado_desc = eh_devolucao(debito, mapeamento_devolucoes)
         estorno_vinculado = id_debito in info_estornos["estornos_vinculados"]
-        pagamento_vinculado = id_debito in info_estornos["pagamentos_vinculados"]
+        pagamento_estorno_vinculado = id_debito in info_estornos["pagamentos_vinculados"]
 
-        # Se é estorno vinculado ou pagamento vinculado, não conciliar com ERP
-        if estorno_vinculado or pagamento_vinculado:
+        # Verificar se é devolução vinculada ou pagamento com devolução vinculada
+        devolucao_vinculada = id_debito in info_devolucoes["devolucoes_vinculadas"]
+        pagamento_com_devolucao = id_debito in info_devolucoes["pagamentos_vinculados"]
+        valor_subtrair = info_devolucoes["valores_subtrair"].get(id_debito, 0)
+
+        # Se é devolução vinculada, marcar com roxo
+        if is_devolucao and devolucao_vinculada:
+            item = criar_item_conciliado(debito, None, mapeamento)
+            item["devolucao"] = True
+            item["pagamento_vinculado_desc"] = pagamento_vinculado_desc
+            itens.append(item)
+            continue
+
+        # Se é devolução sem vínculo (data fora do range)
+        if is_devolucao:
+            item = criar_item_conciliado(debito, None, mapeamento)
+            item["devolucao"] = True
+            item["devolucao_sem_vinculo"] = True
+            item["pagamento_vinculado_desc"] = pagamento_vinculado_desc
+            itens.append(item)
+            continue
+
+        # Se é pagamento com devolução vinculada - conciliar normalmente mas subtrair valor e marcar roxo
+        if pagamento_com_devolucao:
+            disponiveis = [r for r in despesas if r.get("id") not in usados]
+            # Criar cópia do debito com valor ajustado para conciliação
+            debito_ajustado = debito.copy()
+            debito_ajustado["valor"] = abs(debito.get("valor", 0)) - valor_subtrair
+            match = encontrar_correspondente(debito_ajustado, disponiveis)
+
+            if match:
+                usados.add(match.get("id"))
+
+            item = criar_item_conciliado(debito, match, mapeamento)
+            # Ajustar o valor do sicoob para mostrar o valor após subtração
+            item["valor_sicoob"] = abs(debito.get("valor", 0)) - valor_subtrair
+            item["valor_original"] = abs(debito.get("valor", 0))
+            item["valor_devolucao"] = valor_subtrair
+            item["pagamento_com_devolucao"] = True
+            itens.append(item)
+            continue
+
+        # Se é estorno vinculado ou pagamento vinculado a estorno, não conciliar com ERP
+        if estorno_vinculado or pagamento_estorno_vinculado:
             item = criar_item_conciliado(debito, None, mapeamento)
             item["estorno_vinculado"] = True
             itens.append(item)

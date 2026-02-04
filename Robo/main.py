@@ -77,7 +77,7 @@ def main():
         "4": (
             "Sicoob > Lançamentos",
             executar_sicoob_releases,
-            ["sicoob", "releases", "payments"],
+            ["sicoob", "releases", "payments", "returns"],
             "Sicoob Lançamentos",
         ),
         "5": (
