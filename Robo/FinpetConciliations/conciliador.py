@@ -85,6 +85,7 @@ def conciliar(finpet: list, conciliations: list, brands: list) -> list:
     grupos_erp = agrupar_conciliations(conciliations)
 
     todas_chaves = set(grupos_fp.keys()) | set(grupos_erp.keys())
+
     resultado = []
 
     for chave in sorted(todas_chaves):

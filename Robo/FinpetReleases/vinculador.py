@@ -1,10 +1,6 @@
-import logging
-
 from .comparador import calcular_match, criar_comparacoes_vazias
 from .extratores import extrair_pedidos, pedidos_contidos
 from .normalizadores import normalizar_tipo, normalizar_valor
-
-logger = logging.getLogger(__name__)
 
 
 def vincular(finpet_lista: list, releases: list) -> list:
@@ -26,22 +22,11 @@ def _processar_finpet(fp: dict, releases: list, usados: set) -> dict:
     tipo_esperado = normalizar_tipo(tipo_fp)
     pedidos = extrair_pedidos(fp.get("client_name"))
 
-    logger.debug(
-        f"[{tipo_fp}] Processando FINPET: client_name={fp.get('client_name')}, "
-        f"value={fp.get('value')}, auth={fp.get('authorization_number')}"
-    )
-    logger.debug(f"  → Pedidos extraídos: {pedidos}")
-    logger.debug(f"  → Buscando releases com tipo='{tipo_esperado}'")
-
     melhor_match, motivo = _encontrar_melhor_match(fp, releases, usados, tipo_esperado, pedidos)
 
     if melhor_match:
         usados.add(melhor_match["idx"])
         release_vinculado = releases[melhor_match["idx"]]
-        logger.debug(
-            f"[{tipo_fp}] Resultado: VINCULADO com score={melhor_match['score']}, "
-            f"release_id={release_vinculado.get('id_r')}"
-        )
         return {
             "finpet": fp,
             "release": release_vinculado,
@@ -50,7 +35,6 @@ def _processar_finpet(fp: dict, releases: list, usados: set) -> dict:
             "motivo_zerado": None,
         }
 
-    logger.debug(f"[{tipo_fp}] Resultado: NÃO VINCULADO - {motivo}")
     return _criar_resultado_vazio(fp, motivo)
 
 
@@ -70,37 +54,20 @@ def _encontrar_melhor_match(
             continue
 
         descricao = release.get("descricao") or ""
-        pedidos_desc = extrair_pedidos(descricao)
         tem_pedido = pedidos_contidos(pedidos, descricao)
 
         if not tem_pedido:
-            logger.debug(
-                f"  → Release idx={idx}: tipo='{tipo_release}' OK, "
-                f"mas pedidos {pedidos} não encontrados na descrição"
-            )
-            logger.debug(f"    → Pedidos na descrição: {pedidos_desc}")
-            logger.debug(f"    → Descrição: {descricao[:80]}...")
             continue
 
         encontrou_com_pedido = True
         valor_fp = normalizar_valor(fp.get("value"))
         valor_rel = normalizar_valor(release.get("valor"))
-        diferenca = abs(valor_fp - valor_rel)
-
-        logger.debug(
-            f"  → Release idx={idx}: tipo='{tipo_release}' OK, pedidos encontrados OK"
-        )
-        logger.debug(f"    → Descrição: {descricao[:80]}...")
-        logger.debug(f"    → Valor FINPET: {valor_fp}, Valor Release: {valor_rel}, Diferença: {diferenca:.2f}")
 
         match = calcular_match(fp, release)
 
         if not match:
-            logger.debug(f"    → REJEITADO: diferença de valor > R$3,00")
             descartado_por_valor = True
             continue
-
-        logger.debug(f"    → CANDIDATO com score={match['score']}")
 
         if melhor is None or match["score"] > melhor["score"]:
             melhor = {

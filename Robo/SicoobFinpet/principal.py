@@ -48,6 +48,7 @@ def executar_sicoob_finpet(dados):
     finpet = dados.get("finpet", [])
     brands = dados.get("brands", [])
 
+    print(f"  Vinculando {len(sicoob)} registros Sicoob com {len(finpet)} Finpet...")
     vinculados = vincular(sicoob, finpet, brands)
     resultado = conciliar(vinculados)
 

@@ -20,8 +20,8 @@ CORES = {
     "vazio": PatternFill("solid", fgColor="FFCCCC"),
     "total": PatternFill("solid", fgColor="37474F"),
     "destaque": PatternFill("solid", fgColor="ADD8E6"),
-    "estorno": PatternFill("solid", fgColor="FFE0B2"),  # Laranja suave
-    "devolucao": PatternFill("solid", fgColor="E1BEE7"),  # Roxo suave
+    "estorno": PatternFill("solid", fgColor="FFE0B2"),
+    "devolucao": PatternFill("solid", fgColor="E1BEE7"),
     "resumo_header": PatternFill("solid", fgColor="1565C0"),
     "resumo_azul": PatternFill("solid", fgColor="E3F2FD"),
     "resumo_laranja": PatternFill("solid", fgColor="FFF3E0"),
@@ -77,7 +77,7 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
     colunas_destaque = config.get("colunas_destaque", [])
     marcar_vazios = config.get("marcar_vazios", False)
     ignorar_vazios = config.get("ignorar_vazios", [])
-    cor_linha = config.get("cor_linha")  # Cor para toda a linha
+    cor_linha = config.get("cor_linha")
 
     for col, valor in enumerate(valores, 1):
         cel = ws.cell(row=linha, column=col, value=valor)
@@ -85,7 +85,6 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
         cel.alignment = Alignment(horizontal="center", vertical="center")
         cel.font = FONTES["celula"]
 
-        # Cor de fundo base - prioridade: cor_linha > destaque > status > zebra
         if cor_linha and cor_linha in CORES:
             cel.fill = CORES[cor_linha]
         elif col in colunas_destaque:
@@ -97,16 +96,18 @@ def _aplicar_linha(ws, linha, valores, config, zebra=False):
                 cel.fill = CORES["nao"]
             else:
                 cel.fill = CORES["zebra"] if zebra else CORES["branco"]
-        elif marcar_vazios and (valor is None or valor == "") and col not in ignorar_vazios:
+        elif (
+            marcar_vazios
+            and (valor is None or valor == "")
+            and col not in ignorar_vazios
+        ):
             cel.fill = CORES["vazio"]
         else:
             cel.fill = CORES["zebra"] if zebra else CORES["branco"]
 
-        # Formatação moeda
         if col in colunas_moeda:
             cel.number_format = "R$ #,##0.00"
 
-        # Fonte de erro/aviso
         if col in colunas_erro:
             tipo = colunas_erro[col]
             if tipo == "erro":
@@ -134,19 +135,6 @@ def _aplicar_totais(ws, linha, totais, config):
 
 
 def _aplicar_resumo(ws, linha_inicio, dados, config):
-    """
-    Aplica área de resumo no final da folha.
-
-    config["resumo"] deve conter:
-        - titulo: título do resumo (ex: "RESUMO GERAL")
-        - cor_header: cor do cabeçalho ("azul", "verde", etc.)
-        - linhas: lista de dicts com:
-            - label: texto do label
-            - tipo: "contagem", "soma", "quantidade" ou "total_registros"
-            - campo: campo para somar (se tipo="soma" ou "quantidade")
-            - filtro: dict {campo: valor} para filtrar registros
-            - cor: "azul", "laranja" ou "verde" (default: "azul")
-    """
     resumo_config = config.get("resumo")
     if not resumo_config:
         return linha_inicio
@@ -156,10 +144,8 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
     cor_header = resumo_config.get("cor_header", "azul")
     num_colunas = ws.max_column
 
-    # Linha em branco para separação
     linha_inicio += 2
 
-    # Cabeçalho do resumo
     header_fill = CORES.get(f"resumo_{cor_header}_header", CORES["resumo_header"])
     for col in range(1, num_colunas + 1):
         cel = ws.cell(row=linha_inicio, column=col)
@@ -171,7 +157,6 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
     ws.cell(row=linha_inicio, column=1, value=titulo)
     ws.merge_cells(f"A{linha_inicio}:{get_column_letter(num_colunas)}{linha_inicio}")
 
-    # Linhas do resumo
     for item_resumo in linhas:
         linha_inicio += 1
         label = item_resumo.get("label", "")
@@ -180,7 +165,6 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
         filtro = item_resumo.get("filtro", {})
         cor = item_resumo.get("cor", "azul")
 
-        # Aplica estilo nas células
         cor_fill = CORES.get(f"resumo_{cor}", CORES["resumo_azul"])
         cor_font = FONTES.get(f"resumo_{cor}", FONTES["resumo_azul"])
 
@@ -192,7 +176,6 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
             else:
                 cel.fill = CORES["branco"]
 
-        # Label
         ws.cell(row=linha_inicio, column=1, value=label)
         ws.cell(row=linha_inicio, column=1).font = cor_font
         ws.cell(row=linha_inicio, column=1).alignment = Alignment(
@@ -200,12 +183,10 @@ def _aplicar_resumo(ws, linha_inicio, dados, config):
         )
         ws.merge_cells(f"A{linha_inicio}:C{linha_inicio}")
 
-        # Calcula valor baseado no tipo e filtro
         dados_filtrados = dados
         if filtro:
             dados_filtrados = [
-                d for d in dados
-                if all(d.get(k) == v for k, v in filtro.items())
+                d for d in dados if all(d.get(k) == v for k, v in filtro.items())
             ]
 
         if tipo == "total_registros":
@@ -254,40 +235,33 @@ def _criar_folha(wb, nome, dados, headers, campos, config):
     for i, item in enumerate(dados, 2):
         valores = [item.get(c) for c in campos]
 
-        # Monta config dinâmica para linha
         linha_config = config.copy()
 
-        # Suporte a erros por linha
         if "_erros" in item:
             linha_config["colunas_erro"] = {
                 campos.index(k) + 1: v for k, v in item["_erros"].items() if k in campos
             }
 
-        # Suporte a destaque por linha
         if "_destaque" in item:
             linha_config["colunas_destaque"] = [
                 campos.index(k) + 1 for k in item["_destaque"] if k in campos
             ]
 
-        # Suporte a cor de linha inteira
         if "_cor_linha" in item:
             linha_config["cor_linha"] = item["_cor_linha"]
 
         _aplicar_linha(ws, i, valores, linha_config, zebra=(i % 2 == 0))
 
-        # Acumula totais
         for col in colunas_soma:
             val = item.get(campos[col - 1])
             if isinstance(val, (int, float)):
                 totais[col] += val
 
-    # Linha de totais
     linha_atual = len(dados) + 1
     if colunas_soma and dados:
         linha_atual = len(dados) + 2
         _aplicar_totais(ws, linha_atual, totais, config)
 
-    # Área de resumo
     if config.get("resumo") and dados:
         _aplicar_resumo(ws, linha_atual, dados, config)
 
@@ -300,37 +274,12 @@ def _criar_folha(wb, nome, dados, headers, campos, config):
 
 
 def criar_planilha(dados, arquivo, headers=None, campos=None, config=None):
-    """
-    Cria planilha Excel com dados agrupados por mês.
-
-    config aceita:
-        - coluna_data: campo para agrupar por mês (auto-detecta se None)
-        - colunas_status: lista de índices (1-based) para colorir SIM/NÃO
-        - colunas_moeda: lista de índices (1-based) para formato R$
-        - colunas_soma: lista de índices (1-based) para somar e exibir total
-        - larguras: lista de larguras por coluna
-        - marcar_vazios: True para pintar células vazias de rosa
-        - resumo: dict para área de resumo no final de cada folha:
-            - titulo: título do resumo (ex: "RESUMO GERAL")
-            - cor_header: cor do cabeçalho ("azul", "verde", etc.)
-            - linhas: lista de dicts com:
-                - label: texto do label
-                - tipo: "contagem", "soma", "quantidade" ou "total_registros"
-                - campo: campo para somar (se tipo="soma" ou "quantidade")
-                - filtro: dict {campo: valor} para filtrar registros
-                - cor: "azul", "laranja" ou "verde" (default: "azul")
-
-    Cada item pode ter:
-        - _erros: dict {campo: "erro"|"aviso"} para fonte colorida
-        - _destaque: lista de campos para fundo azul claro
-        - _cor_linha: nome da cor para aplicar em toda a linha (ex: "estorno")
-    """
     if not dados:
+        print("⚠ Nenhum dado para criar planilha")
         return None
 
     config = config or {}
 
-    # Detecta campos automaticamente
     campos_internos = {"_erros", "_destaque"}
     if campos is None:
         campos = [k for k in dados[0].keys() if k not in campos_internos]
@@ -344,18 +293,25 @@ def criar_planilha(dados, arquivo, headers=None, campos=None, config=None):
     coluna_data = config.get("coluna_data") or _detectar_coluna_data(campos)
 
     if coluna_data and coluna_data in campos:
-        # Agrupa por mês
         grupos = defaultdict(list)
         for item in dados:
             dt = _parse_data(item.get(coluna_data))
             chave = (dt.year, dt.month) if dt else (9999, 99)
             grupos[chave].append((dt or datetime.max, item))
 
-        # Nomes dos meses em português
         meses_pt = {
-            1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-            5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-            9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+            1: "Janeiro",
+            2: "Fevereiro",
+            3: "Março",
+            4: "Abril",
+            5: "Maio",
+            6: "Junho",
+            7: "Julho",
+            8: "Agosto",
+            9: "Setembro",
+            10: "Outubro",
+            11: "Novembro",
+            12: "Dezembro",
         }
 
         for chave in sorted(grupos.keys()):
@@ -372,4 +328,5 @@ def criar_planilha(dados, arquivo, headers=None, campos=None, config=None):
         _criar_folha(wb, "Dados", dados, headers, campos, config)
 
     wb.save(arquivo)
+    print(f"✔ Planilha criada: {arquivo}")
     return arquivo

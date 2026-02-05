@@ -33,7 +33,6 @@ TEXTO_CARTAO = "Apenas no relatório do cartão"
 
 
 def normalizar_texto(texto):
-    """Remove acentos e normaliza para comparação segura."""
     texto = unicodedata.normalize("NFKD", str(texto))
     return "".join(c for c in texto if not unicodedata.combining(c)).upper().strip()
 
@@ -44,7 +43,6 @@ def eh_fatura(item):
 
 
 def preparar_item(item):
-    """Transforma um item para o formato esperado pelo módulo reutilizável."""
     is_fatura = eh_fatura(item)
     estorno_vinculado = item.get("estorno_vinculado", False)
     estorno_sem_par = item.get("estorno_sem_par", False)
@@ -56,7 +54,6 @@ def preparar_item(item):
     valor_devolucao = item.get("valor_devolucao")
     forma_confere = item.get("forma_confere")
 
-    # Determinar o status de conciliação
     if is_fatura:
         status_conciliado = "FATURA"
     elif estorno_vinculado:
@@ -64,12 +61,10 @@ def preparar_item(item):
     elif is_devolucao:
         status_conciliado = "DEVOLUÇÃO"
     elif pagamento_com_devolucao:
-        # Pagamento com devolução mostra status normal de conciliação
         status_conciliado = "SIM" if item.get("conciliado") else "NÃO"
     else:
         status_conciliado = "SIM" if item.get("conciliado") else "NÃO"
 
-    # Preparar valores
     if is_fatura:
         novo_item = {
             "data_sicoob": item.get("data_sicoob", ""),
@@ -109,7 +104,6 @@ def preparar_item(item):
             "info_complementar": info_complementar,
         }
 
-    # Adicionar marcadores de erro
     erros = {}
     if forma_confere is False:
         erros["forma_pagamento_erp"] = "erro"
@@ -117,15 +111,12 @@ def preparar_item(item):
     if erros:
         novo_item["_erros"] = erros
 
-    # Adicionar marcadores de destaque (fatura usa azul)
     if is_fatura:
         novo_item["_destaque"] = CAMPOS
 
-    # Adicionar cor laranja para estornos vinculados
     if estorno_vinculado:
         novo_item["_cor_linha"] = "estorno"
 
-    # Adicionar cor roxo suave para devoluções e pagamentos com devolução
     if is_devolucao or pagamento_com_devolucao:
         novo_item["_cor_linha"] = "devolucao"
 
@@ -133,23 +124,25 @@ def preparar_item(item):
 
 
 def criar_planilha(itens, caminho):
-    """Cria planilha de conciliação usando o módulo reutilizável."""
     dados = [preparar_item(item) for item in itens]
 
     config = {
         "coluna_data": "data_sicoob",
-        "colunas_status": [3],  # Coluna "Conciliado"
-        "colunas_moeda": [4, 5],  # Valor Sicoob, Valor Simplesvet
+        "colunas_status": [3],
+        "colunas_moeda": [4, 5],
     }
 
     return criar_planilha_base(dados, caminho, headers=HEADERS, campos=CAMPOS, config=config)
 
 
 def executar_sicoob_releases(dados):
+    print("  Conciliando lançamentos Sicoob...")
     dados_brutos = conciliar(dados)
     resultado = dados_brutos.get("itens", [])
 
     if resultado:
         criar_planilha(resultado, "Relatorios/Sicoob Lançamentos.xlsx")
+    else:
+        print("⚠ Nenhum resultado para gerar planilha")
 
     return resultado

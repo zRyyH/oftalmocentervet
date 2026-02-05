@@ -39,9 +39,7 @@ def buscar_finpet_correspondentes(data_sicoob: str, brand: str, finpet: list) ->
 def vincular(sicoob: list, finpet: list, brands: list) -> list:
     resultado = []
 
-    # Filtra apenas brands com gateway FINPET
     brands_finpet = filtrar_brands_finpet(brands)
-
     sicoob_filtrado = filtrar_sicoob(sicoob, brands_finpet)
 
     for s in sicoob_filtrado:

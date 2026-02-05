@@ -6,6 +6,7 @@
 **/*.json
 **/build
 **/dist
+**/.claude
 
 # Cache do Python
 **/__pycache__

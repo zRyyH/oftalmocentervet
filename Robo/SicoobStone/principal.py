@@ -68,11 +68,15 @@ def _preparar_dados(resultado):
 
 
 def executar_sicoob_stone(dados, caminho_stone="Stone/extrato.xlsx"):
+    print(f"  Extraindo dados de {caminho_stone}...")
     dados["stone"] = extrair_dados(caminho_stone)
 
+    print("  Normalizando dados...")
     norm = normalizar_dados(dados)
 
+    print(f"  Vinculando {len(norm['sicoob'])} registros Sicoob com {len(norm['stone'])} Stone...")
     vinculados = vincular(norm["sicoob"], norm["stone"], norm["brands"])
+
     resultado = conciliar(vinculados)
 
     dados_formatados = _preparar_dados(resultado)

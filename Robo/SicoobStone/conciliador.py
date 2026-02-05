@@ -5,15 +5,9 @@ def conciliar(dados_vinculados):
         sicoob = item.get("sicoob", {})
         stone_list = item.get("stone", [])
 
-        # Separa registros normais dos registros com STONECODE 111222201
-        stone_normais = [
-            s for s in stone_list if s.get("stonecode") != "111222201"
-        ]
-        stone_especiais = [
-            s for s in stone_list if s.get("stonecode") == "111222201"
-        ]
+        stone_normais = [s for s in stone_list if s.get("stonecode") != "111222201"]
+        stone_especiais = [s for s in stone_list if s.get("stonecode") == "111222201"]
 
-        # Soma apenas os registros normais para conciliação
         soma_stone = sum(s.get("valor_liquido", 0) for s in stone_normais)
         valor_sicoob = sicoob.get("valor", 0)
         diferenca = round(valor_sicoob - soma_stone, 2)
@@ -21,7 +15,6 @@ def conciliar(dados_vinculados):
 
         primeiro_stone = stone_normais[0] if stone_normais else {}
 
-        # Armazena informações dos registros especiais
         soma_especiais = sum(s.get("valor_liquido", 0) for s in stone_especiais)
         qtd_especiais = len(stone_especiais)
 
