@@ -7,6 +7,7 @@ from SicoobReleases import executar_sicoob_releases
 from SicoobFinpet import executar_sicoob_finpet
 from SicoobFatura import executar_sicoob_fatura
 from SicoobStone import executar_sicoob_stone
+from StoneReleases import executar_stone_releases
 
 
 @dataclass
@@ -53,5 +54,11 @@ COMMANDS = {
         executar_sicoob_stone,
         ["sicoob", "brands"],
         "Sicoob Stone",
+    ),
+    "7": Command(
+        "Stone > Releases",
+        executar_stone_releases,
+        ["releases", "brands"],
+        "Stone Releases",
     ),
 }
