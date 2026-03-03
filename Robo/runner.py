@@ -10,8 +10,12 @@ def executar(command: Command, password: str):
     print(f"\n>>> Executando {command.nome}...\n")
 
     try:
+        collection_filters = {}
+        if command.get_filters:
+            collection_filters = command.get_filters()
+
         print("Buscando dados do PocketBase...")
-        dados = get_data(password, collections=command.collections)
+        dados = get_data(password, collections=command.collections, collection_filters=collection_filters)
 
         print(f"Processando {command.nome}...")
         resultado = command.funcao(dados)

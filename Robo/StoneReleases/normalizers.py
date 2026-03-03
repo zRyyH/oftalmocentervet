@@ -68,6 +68,9 @@ def normalizar_dados(dados):
 
     stone = []
     for s in dados.get("stone", []):
+        num_parcela = str(s.get("Nº DA PARCELA", "") or "").strip()
+        qtd_parcelas = str(s.get("QTD DE PARCELAS", "") or "").strip()
+        parcela = f"{num_parcela} de {qtd_parcelas}" if num_parcela and qtd_parcelas else ""
         stone.append(
             {
                 "bandeira": clean_str(s.get("BANDEIRA")),
@@ -75,6 +78,8 @@ def normalizar_dados(dados):
                 "valor_liquido": parse_decimal_br(s.get("VALOR LÍQUIDO")),
                 "data_vencimento": parse_date(s.get("DATA DE VENCIMENTO")),
                 "stonecode": str(s.get("STONECODE", "")).strip(),
+                "stone_id": str(s.get("STONE ID", "") or "").strip(),
+                "parcela": parcela,
             }
         )
 

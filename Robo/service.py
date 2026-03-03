@@ -24,17 +24,19 @@ class PocketBaseClient:
         return self.pb.health.check()
 
 
-def get_all_items(collection, page_size=500, max_retries=10, retry_delay=5):
+def get_all_items(collection, filter_str="", page_size=500, max_retries=10, retry_delay=5):
     """Busca todos os itens de uma collection usando paginação.
 
     Se não houver registros, tenta novamente até max_retries vezes.
     """
+    query_params = {"filter": filter_str} if filter_str else {}
+
     for attempt in range(1, max_retries + 1):
         all_items = []
         page = 1
 
         while True:
-            result = collection.get_list(page, page_size)
+            result = collection.get_list(page, page_size, query_params=query_params)
             all_items.extend(result.items)
 
             if page >= result.total_pages:
@@ -62,13 +64,14 @@ def serialize_items(items):
     return json.loads(json.dumps(items_dict, default=str))
 
 
-def get_data(password, limit=None, collections=[]):
+def get_data(password, limit=None, collections=[], collection_filters={}):
     pb = PocketBaseClient(password)
 
     data = {}
     for name in collections:
         print(f"  Carregando {name}...")
-        items = get_all_items(pb.collection(name))
+        filter_str = collection_filters.get(name, "")
+        items = get_all_items(pb.collection(name), filter_str=filter_str)
 
         if limit:
             items = items[:limit]

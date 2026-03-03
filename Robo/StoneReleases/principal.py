@@ -6,45 +6,54 @@ from planilha import criar_planilha
 
 HEADERS = [
     "Conciliado",
-    "Data Stone",
+    "Score",
     "Bandeira",
     "Produto",
-    "Valor Stone (R$)",
+    "Data Stone",
     "Data ERP",
-    "Fornecedor ERP",
-    "Parcela ERP",
-    "Forma Pag. ERP",
+    "Valor Stone (R$)",
     "Valor ERP (R$)",
     "Diferença (R$)",
+    "Stonecode Stone",
+    "Stonecode ERP",
+    "Parcela Stone",
+    "Parcela ERP",
+    "Forma Pag. ERP",
+    "Fornecedor ERP",
     "Descrição ERP",
 ]
 
 CAMPOS = [
     "conciliado",
-    "data_stone",
+    "score",
     "bandeira",
     "produto",
-    "valor_stone",
+    "data_stone",
     "data_erp",
-    "fornecedor_erp",
-    "parcela_erp",
-    "forma_pagamento_erp",
+    "valor_stone",
     "valor_erp",
     "diferenca",
+    "stonecode_stone",
+    "stonecode_erp",
+    "parcela_stone",
+    "parcela_erp",
+    "forma_pagamento_erp",
+    "fornecedor_erp",
     "descricao_erp",
 ]
 
 # colunas (1-based):
-# 1=conciliado, 2=data_stone, 3=bandeira, 4=produto
-# 5=valor_stone, 6=data_erp, 7=fornecedor_erp, 8=parcela_erp
-# 9=forma_pagamento_erp, 10=valor_erp, 11=diferenca, 12=descricao_erp
+# 1=conciliado, 2=score, 3=bandeira, 4=produto
+# 5=data_stone, 6=data_erp, 7=valor_stone, 8=valor_erp, 9=diferenca
+# 10=stonecode_stone, 11=stonecode_erp, 12=parcela_stone, 13=parcela_erp
+# 14=forma_pagamento_erp, 15=fornecedor_erp, 16=descricao_erp
 
 CONFIG = {
     "coluna_data": "data_stone",
     "colunas_status": [1],
-    "colunas_moeda": [5, 10, 11],
-    "colunas_soma": [5, 10, 11],
-    "larguras": [12, 12, 16, 10, 16, 12, 30, 12, 12, 16, 14, 50],
+    "colunas_moeda": [7, 8, 9],
+    "colunas_soma": [7, 8, 9],
+    "larguras": [16, 7, 16, 10, 12, 12, 16, 16, 14, 18, 18, 14, 14, 14, 25, 50],
     "resumo": {
         "titulo": "RESUMO GERAL",
         "cor_header": "verde",
@@ -61,15 +70,9 @@ CONFIG = {
                 "cor": "verde",
             },
             {
-                "label": "Não Conciliados (valor divergente):",
+                "label": "Falha Crítica (STONECODE não encontrado):",
                 "tipo": "contagem",
-                "filtro": {"conciliado": "NÃO"},
-                "cor": "verde",
-            },
-            {
-                "label": "Sem ERP (Stone sem lançamento):",
-                "tipo": "contagem",
-                "filtro": {"conciliado": "SEM ERP"},
+                "filtro": {"conciliado": "FALHA CRÍTICA"},
                 "cor": "verde",
             },
             {
@@ -83,9 +86,8 @@ CONFIG = {
 }
 
 _COR_STATUS = {
-    "SIM": None,           # usa zebra padrão (verde já vem de colunas_status)
-    "NÃO": "nao",
-    "SEM ERP": "estorno",  # laranja
+    "SIM": None,           # zebra padrão
+    "FALHA CRÍTICA": "nao",  # vermelho
     "SEM STONE": "devolucao",  # lilás
 }
 
@@ -97,14 +99,61 @@ def _preparar_dados(resultado):
         cor = _COR_STATUS.get(item.get("conciliado"))
         if cor:
             registro["_cor_linha"] = cor
-        # Erro de valor: destacar colunas valor_erp e diferenca em vermelho
-        if item.get("conciliado") == "NÃO":
-            registro["_erros"] = {
-                "valor_erp": "erro",
-                "diferenca": "erro",
-            }
+
+        if item.get("conciliado") == "SIM":
+            erros = {}
+
+            if item.get("data_erp") != item.get("data_stone"):
+                erros["data_erp"] = "erro"
+
+            if round(abs((item.get("valor_erp") or 0) - (item.get("valor_stone") or 0)), 2) != 0:
+                erros["valor_erp"] = "erro"
+
+            if item.get("stonecode_erp") != item.get("stonecode_stone"):
+                erros["stonecode_erp"] = "erro"
+
+            parcela_s = str(item.get("parcela_stone") or "").strip().upper()
+            parcela_e = str(item.get("parcela_erp") or "").strip().upper()
+            if parcela_s != parcela_e:
+                erros["parcela_erp"] = "erro"
+
+            if erros:
+                registro["_erros"] = erros
+
         dados_formatados.append(registro)
     return dados_formatados
+
+
+def get_stone_releases_filters(caminho_stone="Stone/extrato.xlsx"):
+    """Lê o extrato Stone e retorna filtro PocketBase para o mês do extrato."""
+    dados_stone = extrair_dados(caminho_stone)
+
+    from .normalizers import parse_date
+
+    meses = {}
+    for row in dados_stone:
+        d = parse_date(row.get("DATA DE VENCIMENTO"))
+        if d:
+            mes = d[:7]  # "YYYY-MM"
+            meses[mes] = meses.get(mes, 0) + 1
+
+    if not meses:
+        return {}
+
+    mes_extrato = max(meses, key=meses.get)
+    ano, mes = int(mes_extrato[:4]), int(mes_extrato[5:7])
+
+    if mes == 12:
+        ano_fim, mes_fim = ano + 1, 1
+    else:
+        ano_fim, mes_fim = ano, mes + 1
+
+    inicio = f"{ano}-{mes:02d}-01 00:00:00"
+    fim = f"{ano_fim}-{mes_fim:02d}-01 00:00:00"
+
+    filter_str = f"vencimento >= '{inicio}' && vencimento < '{fim}'"
+    print(f"  Filtro releases: {filter_str}")
+    return {"releases": filter_str}
 
 
 def executar_stone_releases(dados, caminho_stone="Stone/extrato.xlsx"):
@@ -122,10 +171,9 @@ def executar_stone_releases(dados, caminho_stone="Stone/extrato.xlsx"):
     resultado = conciliar(vinculados)
 
     conciliados = sum(1 for r in resultado if r["conciliado"] == "SIM")
-    sem_erp = sum(1 for r in resultado if r["conciliado"] == "SEM ERP")
+    falha = sum(1 for r in resultado if r["conciliado"] == "FALHA CRÍTICA")
     sem_stone = sum(1 for r in resultado if r["conciliado"] == "SEM STONE")
-    nao = sum(1 for r in resultado if r["conciliado"] == "NÃO")
-    print(f"  Resultado: {conciliados} SIM | {nao} NÃO | {sem_erp} SEM ERP | {sem_stone} SEM STONE")
+    print(f"  Resultado: {conciliados} SIM | {falha} FALHA CRÍTICA | {sem_stone} SEM STONE")
 
     dados_formatados = _preparar_dados(resultado)
     criar_planilha(dados_formatados, "Relatorios/Stone Releases.xlsx", HEADERS, CAMPOS, CONFIG)

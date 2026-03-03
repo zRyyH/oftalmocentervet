@@ -7,7 +7,7 @@ from SicoobReleases import executar_sicoob_releases
 from SicoobFinpet import executar_sicoob_finpet
 from SicoobFatura import executar_sicoob_fatura
 from SicoobStone import executar_sicoob_stone
-from StoneReleases import executar_stone_releases
+from StoneReleases import executar_stone_releases, get_stone_releases_filters
 
 
 @dataclass
@@ -16,6 +16,7 @@ class Command:
     funcao: Callable
     collections: list[str]
     arquivo_saida: str
+    get_filters: Callable | None = None
 
 
 COMMANDS = {
@@ -60,5 +61,6 @@ COMMANDS = {
         executar_stone_releases,
         ["releases", "brands"],
         "Stone Releases",
+        get_filters=get_stone_releases_filters,
     ),
 }
