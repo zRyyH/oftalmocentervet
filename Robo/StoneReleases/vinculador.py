@@ -1,20 +1,26 @@
-def vincular(stone, releases, brands):
-    # Determina o mês do extrato a partir dos vencimentos Stone (mais frequente)
-    meses = {}
-    for s in stone:
-        d = s.get("data_vencimento", "")
-        if d:
-            mes = d[:7]  # "YYYY-MM"
-            meses[mes] = meses.get(mes, 0) + 1
-    mes_extrato = max(meses, key=meses.get) if meses else None
+import re
 
-    # Filtra apenas releases Stone do mesmo mês do extrato
+
+def _extrair_id_descricao(descricao):
+    """Extrai o número mais à direita da descrição."""
+    numbers = re.findall(r'\d+', descricao or "")
+    return numbers[-1] if numbers else ""
+
+
+def vincular(stone, releases, brands):
+    # Todos os releases Stone, sem filtro de mês
     releases_stone = [
         (idx, r)
         for idx, r in enumerate(releases)
-        if "STONE" in r.get("fornecedor", "")
-        and (not mes_extrato or (r.get("vencimento", "") or "")[:7] == mes_extrato)
+        if "STONE" in (r.get("fornecedor", "") or "").upper()
     ]
+
+    # Índice: id extraído da descrição -> (idx, release)
+    id_para_release = {}
+    for idx, r in releases_stone:
+        eid = _extrair_id_descricao(r.get("descricao", ""))
+        if eid and eid not in id_para_release:
+            id_para_release[eid] = (idx, r)
 
     releases_usados = set()
     resultado = []
@@ -22,22 +28,17 @@ def vincular(stone, releases, brands):
     for s in stone:
         stone_id = s.get("stone_id", "").strip()
 
-        # Find release where stone_id (14-digit transaction ID) is in descricao
         match = None
-        if stone_id:
-            for idx, r in releases_stone:
-                if idx in releases_usados:
-                    continue
-                if stone_id in r.get("descricao", ""):
-                    match = (idx, r)
-                    break
+        if stone_id and stone_id in id_para_release:
+            idx, r = id_para_release[stone_id]
+            if idx not in releases_usados:
+                match = (idx, r)
 
         if match:
             idx, best_release = match
             releases_usados.add(idx)
             resultado.append({"stone": s, "release": best_release})
         else:
-            # FALHA CRÍTICA: stone sem release com STONECODE na descrição
             resultado.append({"stone": s, "release": None})
 
     # Releases Stone que não foram vinculados a nenhum registro Stone

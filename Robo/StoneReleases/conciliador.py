@@ -2,9 +2,9 @@ import re
 
 
 def extrair_stonecode_erp(descricao):
-    """Extrai código numérico de 14 dígitos da descrição ERP."""
-    match = re.search(r'(?<!\d)(\d{14})(?!\d)', descricao or "")
-    return match.group(1) if match else ""
+    """Extrai o número mais à direita da descrição ERP."""
+    numbers = re.findall(r'\d+', descricao or "")
+    return numbers[-1] if numbers else ""
 
 
 def calcular_score(stone, release):
@@ -111,8 +111,8 @@ def conciliar(dados_vinculados):
         descricao = release.get("descricao", "")
         stonecode_erp = extrair_stonecode_erp(descricao)
 
-        if not stone_id or stone_id not in descricao:
-            # STONE ID não encontrado na descrição → FALHA CRÍTICA
+        if not stone_id or stonecode_erp != stone_id:
+            # STONE ID não bate com o extraído da descrição → FALHA CRÍTICA
             resultado.append(_registro_falha_critica(stone))
             continue
 
